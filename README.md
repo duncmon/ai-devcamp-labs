@@ -32,6 +32,7 @@ You give the **orchestrator** (`social_poster`) an idea. It loads **Agent Skills
 |---|---|---|---|
 | Setup | [Setup guide](docs/setup-guide.html) | Google Cloud project, tools, coding agent | `starter` |
 | 1. Build | [Lab 1](docs/lab-1-build.html) | The agent, skills, tools, approval gate, web UI | `pillar-build` |
+| 2. Scale | [Lab 2](https://sonikajanagill.com/ai-devcamp-labs/lab-2-scale.html) · [Learnings & Solutions](docs/LAB2_LEARNINGS.md) | Agent Runtime, Durable Sessions, Memory Bank, Cloud Run | `lab2` |
 
 ```bash
 git checkout pillar-build   # for example: the finished result of Lab 1
