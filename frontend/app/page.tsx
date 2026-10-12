@@ -8,6 +8,7 @@ import "@copilotkit/react-ui/styles.css";
 import { ActivityFeed } from "./components/ActivityFeed";
 import { AuthProvider, GoogleSignInButton, useAuth } from "./components/auth";
 import { ChatResizeHandle } from "./components/ChatResizeHandle";
+import { startNewChat, ThreadPersistence } from "./components/ThreadPersistence";
 import { ConfirmAction } from "./components/ConfirmAction";
 import { GoogleDots, Logo } from "./components/Logo";
 import { PostGallery } from "./components/PostGallery";
@@ -48,6 +49,12 @@ function Header() {
         Built on Google Cloud · ADK + AG-UI + CopilotKit
       </span>
       <div className="header-spacer" />
+      <button
+        className="signout-button new-chat-button"
+        onClick={startNewChat}
+      >
+        New chat
+      </button>
       {user && (
         <div className="user-chip">
           {user.picture ? (
@@ -104,6 +111,7 @@ function Dashboard() {
 
   return (
     <CopilotKit runtimeUrl="/api/copilotkit" agent="social_poster" showDevConsole={false}>
+      <ThreadPersistence />
       <ChatResizeHandle visible={chatOpen} />
       <CopilotSidebar
         defaultOpen

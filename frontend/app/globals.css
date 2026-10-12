@@ -425,6 +425,12 @@ a {
   background: var(--g-grey-100);
 }
 
+.new-chat-button {
+  margin-right: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* ---------- Footer ---------- */
 
 .app-footer {

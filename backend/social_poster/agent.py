@@ -5,7 +5,7 @@ from typing import Any, Optional
 from google.adk.agents import Agent
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.skills import load_skill_from_dir
-from google.adk.tools import google_search
+from google.adk.tools import google_search, load_memory
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.mcp_tool import McpToolset
@@ -60,27 +60,37 @@ linkedin_toolset = McpToolset(
 POST_VIA = os.environ.get("POST_VIA", "").strip().lower()
 use_linkedin = POST_VIA != "buffer"
 use_buffer = bool(BUFFER_API_KEY) and POST_VIA != "linkedin"
+use_memory_bank = bool(os.environ.get("APP_URL") or os.environ.get("AGENT_ENGINE_ID"))
+
+RESEARCH_MODEL = os.environ.get("RESEARCH_MODEL", "gemini-3.5-flash-lite")
+ORCHESTRATOR_MODEL = os.environ.get("ORCHESTRATOR_MODEL", "gemini-3.8-flash")
 
 search_agent = Agent(
     name="web_researcher",
-    model="gemini-flash-latest",
+    model=RESEARCH_MODEL,
     description="Researches facts, dates, and context on the web.",
     instruction="Research the given query and return a concise summary of relevant facts.",
     tools=[google_search],
 )
 
-tools = [AgentTool(agent=search_agent), generate_image, skill_toolset]
+tools = [
+    *([load_memory] if use_memory_bank else []),
+    AgentTool(agent=search_agent),
+    generate_image,
+    skill_toolset,
+]
 
 if use_buffer:
     tools.append(buffer_toolset)
 if use_linkedin:
     tools.append(linkedin_toolset)
 
-# idea -> researching -> drafting -> awaiting_approval -> posted
+# idea -> consulting_memory -> researching -> drafting -> awaiting_approval -> posted
 _TOOL_STAGES = {
     "web_researcher": "researching",
     "load_skill": "drafting",
     "generate_image": "drafting",
+    "load_memory": "consulting_memory",
 }
 
 
@@ -99,19 +109,38 @@ def _track_stage(
     return None  # never modify the tool result
 
 
-def _stage_after_agent(callback_context: CallbackContext) -> None:
+async def _stage_after_agent(callback_context: CallbackContext) -> None:
     # A turn that ends mid-pipeline is waiting on the user (draft approval).
     if callback_context.state.get("pipeline_stage") in ("researching", "drafting"):
         callback_context.state["pipeline_stage"] = "awaiting_approval"
+        return
 
+    if use_memory_bank and callback_context.state.get("pipeline_stage") == "posted":
+        if callback_context.state.get("memory_ingested"):
+            return
+        try:
+            await callback_context.add_session_to_memory()
+            callback_context.state["memory_ingested"] = True
+        except Exception:
+            pass
+
+
+_MEMORY_ROUTING = """
+0. FIRST, before researching or drafting, call load_memory to find out
+   what the user has posted about before, how they phrase things, and any
+   preferences they have stated (preferred platform, tone, topics to avoid).
+   Weave that into the draft brief so the new post sounds like them and
+   doesn't repeat old topics. If nothing comes back, say so briefly and carry
+   on — an empty memory is normal on a first conversation.
+""" if use_memory_bank else ""
 
 root_agent = Agent(
     name="social_poster",
-    model="gemini-flash-latest",
+    model=ORCHESTRATOR_MODEL,
     description="Helps the user turn an idea into a polished social media post.",
-    instruction="""You help the user turn an idea into a social media post.
+    instruction=f"""You help the user turn an idea into a social media post.
 
-Workflow:
+Workflow:{_MEMORY_ROUTING}
 1. If the idea needs facts, dates, or context, research it with the
    web_researcher tool first.
 2. When drafting, load and follow the relevant skills: post-formatter
