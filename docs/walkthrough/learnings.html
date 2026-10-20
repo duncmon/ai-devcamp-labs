@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Attendee Learnings &amp; Architectural Discoveries — Duncan's Portfolio</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    try {
+      var t = localStorage.getItem("social-spark-theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-left">
+      <div class="brand-mark"></div>
+      <a href="index.html" class="nav-title">Social Spark — Attendee Portfolio</a>
+      <span class="nav-subtitle">Comprehensive Attendee Learnings</span>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html">Overview</a>
+      <a href="lab-1.html">Lab 1</a>
+      <a href="lab-2.html">Lab 2</a>
+      <a href="lab-3.html">Lab 3</a>
+      <a href="learnings.html" class="active">Our Learnings</a>
+      <a href="https://sonikajanagill.com/ai-devcamp-labs/doc-viewer.html?src=LEARNINGS.md" target="_blank" rel="noopener" class="upstream-pill">
+        Instructor LEARNINGS.md (Sonika Gill) ↗
+      </a>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">🌗</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Header -->
+    <section class="hero">
+      <div class="hero-meta">
+        <span class="badge blue">Labs 1, 2 &amp; 3 Post-Mortems</span>
+        <span class="badge yellow">Architectural Patterns</span>
+        <span>Independent Attendee Discoveries</span>
+      </div>
+      <h1>Attendee Learnings, Anti-Patterns &amp; Production Solutions</h1>
+      <p class="lead">
+        A complete, consolidated record of the engineering hurdles, architectural trade-offs, and critical anti-patterns discovered while building, scaling, and governing <strong>Social Spark</strong> across Labs 1 through 3.
+      </p>
+      <div class="callout warn">
+        <strong>Important Distinction:</strong> This document captures our own independent learnings as attendees following in the lab instructors' footsteps. It is distinctly separate from the upstream instructor notes in <a href="https://sonikajanagill.com/ai-devcamp-labs/doc-viewer.html?src=LEARNINGS.md" target="_blank" rel="noopener"><code>LEARNINGS.md</code></a> (authored by Sonika Gill and the DevCamp core team). Rather than merely describing happy paths, this document analyzes where real-world systems fail, why certain implementations violate the Principle of Least Astonishment, and how to build resilient, fail-safe architectures.
+      </div>
+    </section>
+
+    <!-- TABLE OF CONTENTS -->
+    <section class="step-card">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Index</span>
+          <h3 class="step-title">Directory of Engineering Learnings</h3>
+        </div>
+      </div>
+      <div class="step-body">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; font-size: 13.5px;">
+          <div>
+            <strong>Pillar 1 (Build) Discoveries:</strong>
+            <ul style="margin: 6px 0; padding-left: 18px;">
+              <li><a href="#issue-duplicate-tool">1. Duplicate Tool Declaration &amp; Routing Trap</a></li>
+              <li><a href="#issue-checkpoint-errance">2. Documentation Errance &amp; Checkpoint Discipline</a></li>
+              <li><a href="#issue-buffer-hitl">3. Dual-Path Side-Effect Gate (Buffer MCP)</a></li>
+              <li><a href="#issue-search-mixing">4. Native Search Grounding vs. Custom Tool Mixing</a></li>
+              <li><a href="#issue-gcs-preview">5. GCS Image URL Preview vs. Public Access Trap</a></li>
+            </ul>
+          </div>
+          <div>
+            <strong>Pillar 2 (Scale) Discoveries:</strong>
+            <ul style="margin: 6px 0; padding-left: 18px;">
+              <li><a href="#issue-model-404">6. Model Resolution 404 &amp; Regional Routing</a></li>
+              <li><a href="#issue-playground-400">7. Console Playground 400/404 Runtime Contracts</a></li>
+              <li><a href="#issue-hitl-deadlock">8. Console Playground Confirmation Deadlock</a></li>
+              <li><a href="#issue-scale-zero-memory">9. Scale-to-Zero Memory &amp; Session Eviction</a></li>
+              <li><a href="#issue-frontend-auth">10. Frontend ADC Streaming Proxy Architecture</a></li>
+              <li><a href="#issue-secret-trap">11. Secret Manager in Containerized Agent Runtime</a></li>
+              <li><a href="#issue-buffer-delay">12. Buffer Review Delay Safeguard</a></li>
+            </ul>
+          </div>
+          <div>
+            <strong>Pillar 3 (Govern) Discoveries:</strong>
+            <ul style="margin: 6px 0; padding-left: 18px;">
+              <li><a href="#issue-pola">13. Configuration Anti-Pattern &amp; POLA</a></li>
+              <li><a href="#issue-dlp-domestic">14. Domestic Phone Detection in Cloud DLP</a></li>
+              <li><a href="#issue-dlp-overscrub">15. Syntactic Redaction vs. Semantic Context</a></li>
+              <li><a href="#issue-asgi-loop">16. Pure-ASGI Streaming Disconnect Loop</a></li>
+              <li><a href="#issue-registry-wiki">17. Agent Registry vs. 50-Agent Static Wiki</a></li>
+              <li><a href="#issue-policy-enforce">18. Governance Policy: Existence vs. Enforcement</a></li>
+              <li><a href="#issue-inspect-trap">19. The "Inspect-Only" Trap &amp; Fail-Closed Posture</a></li>
+              <li><a href="#issue-8mb-quota">20. Vertex AI 8MB Payload Quota Trap</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <article class="step-card" id="issue-duplicate-tool">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 1 · Build</span>
+          <h2 class="step-title">Duplicate Tool Declaration (<code>create_post</code>) &amp; The "Self-Made" Routing Trap</h2>
+        </div>
+        <span class="badge blue">Build</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> The Symptom &amp; Root Cause</div>
+          <p>
+            During Step 6 verification in <code>adk web</code>, when prompted to post via Buffer scheduled for Tuesday, the agent replied: <em>"I can post to LinkedIn, but I don't have the ability to post directly to Buffer. Would you like me to post this draft to LinkedIn instead?"</em> The agent spoke the absolute truth: Buffer tools were completely missing from <code>root_agent.tools</code>.
+          </p>
+          <p>
+            <strong>The History &amp; Anti-Pattern:</strong> In our initial implementation (Git tag <code>LabEndSession2</code>), <code>linkedin_toolset</code> was initialized with <code>tool_name_prefix="linkedin"</code>, generating <code>linkedin_create_post</code> while Buffer provided <code>create_post</code>. Both coexisted seamlessly. In a later refactoring to selectively gate publishing with <code>require_confirmation=True</code> while leaving read-only lookups ungated, <code>tool_name_prefix="linkedin"</code> was accidentally omitted. This exposed two tools named <code>create_post</code>, triggering Gemini's <code>400 INVALID_ARGUMENT: Duplicate function declaration found: create_post</code>. To bypass this error during downstream Lab 3 evaluations, <code>POST_VIA=linkedin</code> was hardcoded in <code>.env</code>, silently dropping Buffer.
+          </p>
+          <p>
+            <strong>The Solution:</strong> Re-added <code>tool_name_prefix="linkedin"</code> to <code>linkedin_toolset</code> and <code>linkedin_post_toolset</code> in <code>agent.py</code>. Kept Buffer tools unprefixed (<code>create_post</code>, <code>list_channels</code>, <code>get_account</code>). Updated state callbacks (<code>_track_stage</code>) and DLP redaction (<code>redact_before_post</code>) to handle both tool names. Set <code>POST_VIA=auto</code> in <code>.env</code>. Both tools are now active simultaneously with zero namespace collisions.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-checkpoint-errance">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 2 · Build</span>
+          <h2 class="step-title">Documentation Errance: Checkpoint Requirement Hallucination vs. Architectural Trace Verification</h2>
+        </div>
+        <span class="badge blue">Build</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> The Errance &amp; Discipline Enforced</div>
+          <p>
+            During Step 4 documentation drafting, the verification was initially claimed as satisfying "no buzzwords, max 1 emoji, engineering tone" (a qualitative text check), and Figure 4.1 was mistakenly populated with an <code>upload_image</code> trace from Step 3.
+          </p>
+          <p>
+            <strong>The Actual Checkpoint Requirement (<code>lab-1-build.html#step4</code>):</strong> The Cloud Trace waterfall must show <code>load_skill</code> firing for <code>post-formatter</code>, <code>platform-style</code>, and <code>brand-voice</code>, and a second-level <code>load_skill_resource</code> read of <code>references/linkedin.md</code> only when the draft is for LinkedIn, with <code>brand-voice</code> loading with no name-mismatch error.
+          </p>
+          <p>
+            <strong>Remediation:</strong> Enforced a strict two-part structure for every checkpoint card: <strong>Requirement</strong> (verbatim or faithful extract of the course specification) and <strong>Fulfillment</strong> (verifiable data referencing authentic screenshot figures from attendee sessions). Replaced the misattributed image with authentic captures: <code>load_skill("brand-voice")</code> (Span 16), <code>load_skill_resource("references/linkedin.md")</code> (Span 23), and <code>load_skill("platform-style")</code> (Span 20).
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-buffer-hitl">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 3 · Build</span>
+          <h2 class="step-title">Dual-Path Verification of the Human-in-the-Loop Confirmation Gate (Buffer MCP)</h2>
+        </div>
+        <span class="badge blue">Build</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> Verifying Affirmative &amp; Negative Branches</div>
+          <p>
+            ADK's <code>require_confirmation=True</code> attribute creates a framework-level pause on side-effect toolsets, returning an <code>adk_request_confirmation</code> payload that halts runtime execution regardless of what the LLM decides. Thorough verification requires proving both branches:
+          </p>
+          <p>
+            <strong>1. Negative Branch (Withholding Confirmation):</strong> In session <code>60ff1932...</code>, submitting <code>confirmed: false</code> cleanly intercepted <code>create_post</code>. The tool execution was blocked, an issue notification was returned to the user, and <code>pipeline_stage</code> remained safely in <code>awaiting_approval</code>. Zero API calls reached Buffer.
+          </p>
+          <p>
+            <strong>2. Affirmative Branch (Granting Confirmation):</strong> Checking <code>[x] Confirmed</code> (<code>confirmed: true</code>) resumed execution, dispatched the post payload to Buffer's remote MCP server, transitioned state to <code>posted</code>, and was verified live in the Buffer dashboard queue for channel <em>DryTesting Company</em> at <code>publish.buffer.com</code>.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-search-mixing">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 4 · Build</span>
+          <h2 class="step-title">Tool Mixing Constraint: Native Google Search Grounding vs. Custom Function Declarations</h2>
+        </div>
+        <span class="badge blue">Build</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> The Deliberate Course Error &amp; Sub-Agent Architecture</div>
+          <p>
+            In ADK Step 5, attempting to mount <code>google_search</code> directly alongside custom Python tools (such as <code>generate_image</code> or <code>check_text_length</code>) on the same agent triggers a Gemini API error: native Google Search grounding cannot be declared alongside custom function call definitions in the same model invocation.
+          </p>
+          <p>
+            <strong>The Idiomatic Solution:</strong> Decouple web research into a specialist <strong>Sub-Agent</strong> (<code>research_agent</code>) possessing <em>only</em> <code>google_search</code>. The root orchestrator mounts <code>research_agent</code> as an <code>AgentTool</code>, delegating factual queries to it and receiving synthesized text to guide subsequent drafting without schema collisions.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-gcs-preview">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 5 · Build</span>
+          <h2 class="step-title">Public Access Prevention (PAP) &amp; The GCS Image URL Preview Trap</h2>
+        </div>
+        <span class="badge blue">Build</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> The 412/403 Storage Trap</div>
+          <p>
+            The setup guide suggests granting <code>allUsers:objectViewer</code> on the GCS bucket to provide public image URLs for Buffer and chat previews. On managed or enterprise GCP projects, Public Access Prevention (PAP) is enforced by organization policy. Attempting to add <code>allUsers</code> returns <code>HTTPError 412: The member bindings allUsers and allAuthenticatedUsers are not allowed since public access prevention is enforced.</code>
+          </p>
+          <p>
+            <strong>The Decoupled Solution:</strong>
+            1. For in-chat browser previews, do not rely on public GCS URLs. Serve local gallery assets via the backend's authenticated static endpoint (<code>/outputs/&lt;filename&gt;</code>), referenced deterministically by the orchestrator.
+            2. For external Buffer publishing, use V4 signed URLs generated via service-account token impersonation (<code>iam.serviceAccountTokenCreator</code> on <code>social-spark-uploader</code>) rather than downloading permanent credential keys.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-model-404">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 6 · Scale</span>
+          <h2 class="step-title">Vertex AI Model Resolution 404 &amp; Regional Routing</h2>
+        </div>
+        <span class="badge green">Scale</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> Symptom &amp; Fix</div>
+          <p>
+            Invoking models on Vertex AI Reasoning Engine produced <code>404 NOT_FOUND</code> when using aliases like <code>gemini-flash-latest</code>.
+          </p>
+          <p>
+            <strong>Root Cause:</strong> Vertex AI Reasoning Engine requires concrete versioned model strings (e.g. <code>gemini-2.5-flash</code>, <code>gemini-3.8-flash</code>), whereas <code>-latest</code> aliases exist only in AI Studio. Furthermore, Gemini 3 models require <code>GOOGLE_CLOUD_LOCATION=global</code>.
+          </p>
+          <p>
+            <strong>Solution:</strong> Pinned concrete model strings in environment variables and set <code>GOOGLE_CLOUD_LOCATION=global</code>.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-playground-400">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 7 · Scale</span>
+          <h2 class="step-title">Console Playground Runtime Contracts (400, 404, 422 Errors)</h2>
+        </div>
+        <span class="badge green">Scale</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> Symptom &amp; Fix</div>
+          <p>
+            Testing in the Google Cloud Console Playground returned <code>Reasoning engine execution failed: Status 400 Error code: 3</code> or <code>404</code>.
+          </p>
+          <p>
+            <strong>Root Cause:</strong> The Console Playground calls <code>reasoningEngines:streamQuery</code>, which routes to <code>/api/stream_reasoning_engine</code>. It sends diverse JSON shapes (<code>message</code>, <code>query</code>, <code>prompt</code>, or structured <code>Content</code>) and passes full GCP session resource paths (<code>projects/.../locations/.../sessions/5220770002281431040</code>) that broke local lookups.
+          </p>
+          <p>
+            <strong>Solution:</strong> Mounted both <code>/stream_reasoning_engine</code> and <code>/api/stream_reasoning_engine</code> in FastAPI, implemented dynamic payload unwrapping, and stripped resource paths: <code>session_id = raw_session.split('/')[-1]</code>.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-hitl-deadlock">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 8 · Scale</span>
+          <h2 class="step-title">Console Playground Tool Confirmation Deadlock</h2>
+        </div>
+        <span class="badge green">Scale</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> Symptom &amp; Fix</div>
+          <p>
+            In the Console Playground, typing "Approve" after an <code>adk_request_confirmation</code> event repeatedly asked for approval without executing the tool.
+          </p>
+          <p>
+            <strong>Root Cause:</strong> ADK requires a structured <code>ToolConfirmation</code> object to resume execution. The Console Playground is a generic text chat UI and lacks interactive widgets to emit this payload.
+          </p>
+          <p>
+            <strong>Solution:</strong> Deployed the web UI with CopilotKit's <code>ConfirmAction.tsx</code>, which renders interactive <strong>Approve</strong> and <strong>Reject</strong> buttons that emit the structured JSON payload required by ADK.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-scale-zero-memory">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 9 · Scale</span>
+          <h2 class="step-title">Scale-to-Zero Memory &amp; Session Eviction</h2>
+        </div>
+        <span class="badge green">Scale</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> Symptom &amp; Fix</div>
+          <p>
+            In serverless scale-to-zero environments (<code>min_instances=0</code>), conversation state and Memory Bank extraction failed to persist between requests.
+          </p>
+          <p>
+            <strong>Root Cause:</strong> Frameworks schedule memory distillation as an idle background cleanup task. Cloud Run and Agent Runtime immediately terminate container processes when HTTP responses complete.
+          </p>
+          <p>
+            <strong>Solution:</strong> Wired an explicit synchronous <code>after_turn_callback</code> in <code>agent.py</code> that awaits <code>add_session_to_memory()</code> before completing the HTTP response.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-frontend-auth">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 10 · Scale</span>
+          <h2 class="step-title">Frontend Authentication to Agent Runtime &amp; Token Security</h2>
+        </div>
+        <span class="badge green">Scale</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> Architecture &amp; Solution</div>
+          <p>
+            Browser clients cannot safely call the Agent Runtime <code>/api</code> passthrough directly because it requires Google Cloud Bearer tokens. Exposing GCP credentials in browser JavaScript is a major security vulnerability.
+          </p>
+          <p>
+            <strong>Solution:</strong> Added same-origin Next.js server-side route handlers (<code>/api/adk</code>, <code>/api/posts</code>) using <code>google-auth-library</code>. The server attaches Google Cloud ADC tokens on the fly, keeping credentials completely hidden from client browsers.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-secret-trap">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 11 · Scale</span>
+          <h2 class="step-title">Secret Manager in Containerized Agent Runtime</h2>
+        </div>
+        <span class="badge green">Scale</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> The Container Deploy Trap</div>
+          <p>
+            Passing secrets via <code>agents-cli deploy --secrets BUFFER_API_KEY=...</code> fails in container-based deployments with an opaque error: <em>"The Reasoning Engine failed to be updated"</em>.
+          </p>
+          <p>
+            <strong>Solution:</strong> Deploy with the secret's <strong>name</strong> only (<code>BUFFER_API_KEY_SECRET=buffer-api-key</code>), grant the Agent Identity principal <code>roles/secretmanager.secretAccessor</code>, and read the secret at runtime using ADK's <code>SecretManagerClient</code>. Hand-rolled REST calls with bearer tokens return 401 inside the container; the official client library must be used.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-buffer-delay">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 12 · Scale</span>
+          <h2 class="step-title">Buffer Review Delay Safeguard (<code>BUFFER_REVIEW_DELAY_MINUTES</code>)</h2>
+        </div>
+        <span class="badge green">Scale</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> The Real-World Posting Risk</div>
+          <p>
+            Buffer provides no dry-run concept at all. <code>DRY_RUN=true</code> only covers the local LinkedIn MCP server. Early testing in this project published a real social post because of this false assumption.
+          </p>
+          <p>
+            <strong>Solution:</strong> <code>BUFFER_REVIEW_DELAY_MINUTES=60</code> forces any real post to <code>customScheduled</code> at least 60 minutes in the future, providing a safety window to inspect or cancel the draft in the Buffer dashboard before it goes live.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-pola">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 13 · Govern</span>
+          <h2 class="step-title">Configuration Resolution Anti-Pattern &amp; The Principle of Least Astonishment</h2>
+        </div>
+        <span class="badge yellow">Govern</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> Context &amp; The Brute-Failure Anti-Pattern</div>
+          <p>
+            In Step 5 of Lab 3, executing <code>uv run python backend/governance.py registry-agents</code> crashed with:
+          </p>
+          <pre><code>Set GOOGLE_CLOUD_PROJECT to your GCP project ID (export GOOGLE_CLOUD_PROJECT=...).</code></pre>
+          <p>
+            Throughout Labs 1 and 2, project configuration lived in <code>backend/social_poster/.env</code>. <code>governance.py</code> was written as a standalone REST tool that omitted <code>load_dotenv()</code> and strictly demanded <code>os.environ["GOOGLE_CLOUD_PROJECT"]</code>, while the instruction to export it was deferred to Step 6.
+          </p>
+          <p>
+            Breaking an established convention (moving from automated <code>.env</code> loading to a mandatory manual shell export) while deferring the explanation violates the <strong>Principle of Least Astonishment (POLA)</strong>.
+          </p>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">📐</span> The Multi-Tier Resolution Hierarchy</div>
+          <p>
+            Production tooling should implement a predictable, graceful multi-tier fallback:
+          </p>
+          <pre style="line-height: 1.5; font-size: 12px;">
+       ┌────────────────────────────────────────────────────────┐
+       │ 1. Explicit Environment Variable ($GOOGLE_CLOUD_PROJECT)│ ─── Highest precedence
+       └───────────────────────────┬────────────────────────────┘
+                                   │ (if unset)
+                                   ▼
+       ┌────────────────────────────────────────────────────────┐
+       │ 2. Local Configuration File (.env via python-dotenv)   │ ─── Project workspace default
+       └───────────────────────────┬────────────────────────────┘
+                                   │ (if unset)
+                                   ▼
+       ┌────────────────────────────────────────────────────────┐
+       │ 3. Active Cloud Context / ADC (google.auth.default)    │ ─── CLI environment fallback
+       └───────────────────────────┬────────────────────────────┘
+                                   │ (if unset)
+                                   ▼
+       ┌────────────────────────────────────────────────────────┐
+       │ 4. Clear Remediation Instructions (Fail Closed)        │ ─── Graceful termination
+       └────────────────────────────────────────────────────────┘
+          </pre>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">💻</span> Solution Implementation</div>
+          <pre><code># backend/governance.py (Multi-tier resolution implementation)
+import os, pathlib, sys, google.auth
+from dotenv import load_dotenv
+
+# 1. Dynamically locate .env relative to script location
+_env_path = pathlib.Path(__file__).parent / "social_poster" / ".env"
+if _env_path.exists():
+    load_dotenv(_env_path)
+elif (pathlib.Path(__file__).parents[1] / ".env").exists():
+    load_dotenv(pathlib.Path(__file__).parents[1] / ".env")
+
+# 2. Check process environment
+PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT") or os.environ.get("PROJECT_ID")
+
+# 3. Fallback to active Application Default Credentials (ADC)
+if not PROJECT:
+    try:
+        _, adc_project = google.auth.default()
+        PROJECT = adc_project
+    except Exception:
+        pass
+
+# 4. Fail closed with helpful diagnostic instructions
+if not PROJECT:
+    sys.exit("Set GOOGLE_CLOUD_PROJECT to your GCP project ID (export GOOGLE_CLOUD_PROJECT=...).")</code></pre>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">⚖️</span> Trade-Off Comparison</div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--border);">
+                <th style="padding: 8px;">Approach</th>
+                <th style="padding: 8px;">Behavior</th>
+                <th style="padding: 8px;">Best Use Case</th>
+                <th style="padding: 8px;">Failure Modes &amp; Trade-offs</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 8px;"><strong>Multi-Tier Fallback</strong></td>
+                <td style="padding: 8px;">Checks flags &rarr; env &rarr; <code>.env</code> &rarr; ADC</td>
+                <td style="padding: 8px;">Applications, shared SDKs, CLI tools</td>
+                <td style="padding: 8px;">Requires small helper code; can mask wrong default if user has multiple projects.</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 8px;"><strong>Inline Variable</strong> (<code>PROJECT=... uv run</code>)</td>
+                <td style="padding: 8px;">Scoped strictly to single process execution</td>
+                <td style="padding: 8px;">Ad-hoc tests, CI/CD runners, quick A/B testing</td>
+                <td style="padding: 8px;">High typing overhead; easily mistyped; leaves no persistent state across calls.</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px;"><strong>Explicit Export</strong> (<code>export PROJECT=...</code>)</td>
+                <td style="padding: 8px;">Exported into shell environment</td>
+                <td style="padding: 8px;">Long-lived single-target terminal sessions</td>
+                <td style="padding: 8px;">Lost across new tabs; local variable assignment without <code>export</code> silently fails to propagate.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-dlp-domestic">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 14 · Govern</span>
+          <h2 class="step-title">Cloud DLP Telephone Detection on Domestic Formats</h2>
+        </div>
+        <span class="badge yellow">Govern</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> Symptom &amp; Root Cause</div>
+          <p>
+            When testing natural post drafts (e.g. <em>"Contact Daniel at daniel.okonkwo@example.com or 020 7946 0000"</em>), Cloud DLP successfully redacted names and emails, but left the UK domestic phone number <code>020 7946 0000</code> completely unredacted.
+          </p>
+          <p>
+            <strong>Root Cause:</strong> Cloud DLP's built-in <code>PHONE_NUMBER</code> infoType is tuned for international E.164 formats (<code>+44...</code>) or numbers surrounded by telephony context words ("call", "phone"). Domestic numbers in natural sentences without prefixes receive low confidence scores and are ignored.
+          </p>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">💡</span> Solution: Multi-Country Regex InfoTypes</div>
+          <p>
+            In <code>backend/social_poster/guardrails.py</code>, we implemented custom regex detectors overriding <code>PHONE_NUMBER</code> across multiple jurisdictions: UK (<code>0[1-9]\d{8,9}</code>), France (<code>0[1-9](?:\s?\d{2}){4}</code>), China (<code>1[3-9]\d{9}</code>), and Argentina (<code>011\s?\d{4}-\d{4}</code>).
+          </p>
+          <pre><code># Multi-country domestic phone regex detector configuration
+custom_info_types = [
+    dlp_v2.CustomInfoType(
+        info_type=dlp_v2.InfoType(name="PHONE_NUMBER"),
+        regex=dlp_v2.CustomInfoType.Regex(
+            pattern=r"(?:(?:\+44\s?|0)(?:20\s?\d{4}\s?\d{4}|[1-9]\d{3}\s?\d{5,6}))|(?:0[1-9](?:[\s.-]?\d{2}){4})|(?:1[3-9]\d{9})|(?:011[\s-]?\d{4}[\s-]?\d{4})"
+        ),
+        likelihood=dlp_v2.Likelihood.VERY_LIKELY,
+    )
+]</code></pre>
+          <p>
+            This achieved 100% detection accuracy on domestic numbers while preserving name and email redaction.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-dlp-overscrub">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 15 · Govern</span>
+          <h2 class="step-title">Syntactic Redaction vs. Semantic Context (Over-Scrubbing)</h2>
+        </div>
+        <span class="badge yellow">Govern</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> Observation &amp; Governance Philosophy</div>
+          <p>
+            During testing, Cloud DLP redacted famous historical figures (e.g., <em>Marie Curie</em> became <code>[PERSON_NAME]</code>) and high-entropy numeric model codes (e.g., <code>ZX-4900-881</code> became <code>[PHONE_NUMBER]</code>).
+          </p>
+          <p>
+            <strong>Core Insight:</strong> Cloud DLP is a syntactic pattern classifier, not a semantic reasoning engine. It cannot discern whether a name belongs to a private citizen or a historical figure.
+          </p>
+          <p>
+            <strong>Recall Over Precision:</strong> In boundary data governance, a <strong>false negative</strong> (leaking real customer PII into vector storage) violates GDPR and carries legal liabilities. A <strong>false positive</strong> (redacting a product code or historical figure) is merely cosmetic. Boundary filters must remain high-recall and fail-closed.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-asgi-loop">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 16 · Govern</span>
+          <h2 class="step-title">Pure-ASGI Middleware Streaming Disconnect Loop</h2>
+        </div>
+        <span class="badge yellow">Govern</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> Symptom &amp; Fix</div>
+          <p>
+            When implementing <code>RedactUserMessages</code> in <code>backend/pii_middleware.py</code>, streaming HTTP responses hung or spun in a tight loop.
+          </p>
+          <p>
+            <strong>Root Cause:</strong> In ASGI, <code>receive()</code> provides the request body chunks and then transitions to listening for HTTP client disconnects. Replaying the redacted body continuously caused the disconnect listener to loop infinitely.
+          </p>
+          <p>
+            <strong>Solution:</strong> Implemented a single-handover flag in the wrapped <code>receive()</code> generator:
+          </p>
+          <pre><code>delivered = False
+async def wrapped_receive():
+    nonlocal delivered
+    if not delivered:
+        delivered = True
+        return {"type": "http.request", "body": redacted_body, "more_body": False}
+    # Hand control back to ASGI connection listener for disconnect events
+    return await receive()</code></pre>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-registry-wiki">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 17 · Govern</span>
+          <h2 class="step-title">Agent Registry vs. The 50-Agent Static Wiki Problem</h2>
+        </div>
+        <span class="badge yellow">Fleet Governance</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> The 6 Enterprise Capabilities</div>
+          <p>
+            Why an enterprise with 50+ autonomous agents cannot manage toolsets or identity via internal wikis (Notion, Confluence):
+          </p>
+          <ol>
+            <li><strong>Cryptographic Identity Binding:</strong> An Agent Registry entry is tied to a Google Cloud workload principal (<code>principal://agents.global...</code>). A wiki page is passive text subject to human tampering.</li>
+            <li><strong>Autonomous Vector Discovery:</strong> Orchestrator agents query <code>/mcpServers:search</code> dynamically at runtime to locate tools (e.g. BigQuery MCP with 9 tools). Agents cannot parse human wiki tables.</li>
+            <li><strong>Live Health &amp; Operational State:</strong> Wiki documentation drifts within weeks. The Registry dynamically reflects live endpoints, container status, and versioning.</li>
+            <li><strong>Strict Schema Contracts:</strong> The registry publishes machine-validated JSON schemas, preventing breaking tool signature changes across consuming agents.</li>
+            <li><strong>Centralized RBAC:</strong> Security teams can enforce uniform organization-wide access policies on tools. Wikis have zero enforcement capability.</li>
+            <li><strong>Auditable Telemetry:</strong> All discovery queries, tool callouts, and security incidents link back to the registered Agent Identity across Cloud Logging and Security Command Center.</li>
+          </ol>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-policy-enforce">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 18 · Govern</span>
+          <h2 class="step-title">Semantic Governance: Policy Existence vs. Live Runtime Enforcement</h2>
+        </div>
+        <span class="badge yellow">Govern</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> The Common Mental Trap</div>
+          <p>
+            Running <code>governance.py create "The agent must never publish a social post without explicit human approval"</code> registers the policy in Cloud Console under <strong>Business policies</strong> bound to the agent identity.
+          </p>
+          <p>
+            <strong>The Trap:</strong> Assuming that registering the policy automatically enforces it at runtime.
+          </p>
+          <p>
+            <strong>What Actually Enforces:</strong> The application-level approval gate (<code>require_confirmation=True</code> in ADK) running inside the container blocks unapproved posts.
+          </p>
+          <p>
+            <strong>Why:</strong> Live policy enforcement by the Semantic Governance Engine requires a dedicated enterprise network harness: an Agent Gateway with client-to-agent ingress routing, a dedicated VPC network with Private Service Connect (PSC), and an authorization extension intercepting Gemini <code>:generateContent</code> API calls. Conflating policy existence with runtime enforcement is a major trap in AI governance.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-inspect-trap">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 19 · Govern</span>
+          <h2 class="step-title">The "Inspect-Only" Trap &amp; Fail-Closed Posture (<code>failOpen: false</code>)</h2>
+        </div>
+        <span class="badge red">Security Posture</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> Decorative Guardrails vs. Enforced Security</div>
+          <p>
+            Configuring guardrails in <strong>"Inspect-Only"</strong> mode logs violations to a dashboard but does not block requests. This is a <em>decorative guardrail</em>: organizations believe they are protected while attacks reach the model unimpeded.
+          </p>
+          <p>
+            Similarly, setting <code>failOpen: true</code> on Service Extensions causes the proxy to silently bypass inspection if Model Armor experiences timeouts.
+          </p>
+          <p>
+            <strong>The Production Standard:</strong> Setting <code>failOpen: false</code> with <code>timeout: 5s</code> ensures that any failure of the security backend fails loud and fast (HTTP 403), preventing security services from becoming silent bypass vectors.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-8mb-quota">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 20 · Govern</span>
+          <h2 class="step-title">Vertex AI 8MB Request Payload Quota Trap &amp; <code>.gcloudignore</code></h2>
+        </div>
+        <span class="badge yellow">Deployment Quota</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> Symptom &amp; Permanent Fix</div>
+          <p>
+            Deployments via <code>agents-cli deploy</code> failed with:
+          </p>
+          <pre><code>google.api_core.exceptions.InvalidArgument: 400 Request payload size exceeds the limit: 8388608 bytes.</code></pre>
+          <p>
+            <strong>Root Cause:</strong> Vertex AI Reasoning Engine API enforces a hard 8MB limit on the uploaded source bundle. Because <code>docs/screenshots/</code> exceeded 11MB, the CLI bundled these non-code assets into the deployment archive.
+          </p>
+          <p>
+            <strong>Solution:</strong> Added a root <code>.gcloudignore</code> file:
+          </p>
+          <pre><code>docs/
+frontend/
+evals/
+*.png
+*.svg
+*.jpg
+node_modules/
+.git/
+.venv/</code></pre>
+          <p>
+            This reduced the payload from over 11MB to under <strong>50KB</strong>, ensuring instant deployments.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <!-- Footer -->
+    <footer>
+      <div><a href="index.html">← Back to Overview</a> | <a href="lab-3.html">View Lab 3 Walkthrough →</a></div>
+      <div>Maintained in <code>ai-devcamp-labs/docs/walkthrough/learnings.html</code></div>
+    </footer>
+  </main>
+
+  <script src="lightbox.js"></script>
+  <script>
+    (function () {
+      var KEY = "social-spark-theme";
+      var root = document.documentElement;
+      var btn = document.getElementById("themeToggle");
+      function showing() {
+        return root.dataset.theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      }
+      if (btn) {
+        btn.addEventListener("click", function () {
+          var next = showing() === "dark" ? "light" : "dark";
+          root.dataset.theme = next;
+          try { localStorage.setItem(KEY, next); } catch (e) {}
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

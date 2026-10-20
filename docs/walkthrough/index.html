@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Duncan's Social Spark DevCamp Portfolio — GDG London</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    try {
+      var t = localStorage.getItem("social-spark-theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-left">
+      <div class="brand-mark"></div>
+      <a href="index.html" class="nav-title">Social Spark — Attendee Portfolio</a>
+      <span class="nav-subtitle">GDG London AI DevCamp 2026</span>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html" class="active">Overview</a>
+      <a href="lab-1.html">Lab 1 (Build)</a>
+      <a href="lab-2.html">Lab 2 (Scale)</a>
+      <a href="lab-3.html">Lab 3 (Govern)</a>
+      <a href="learnings.html">Our Learnings</a>
+      <a href="https://sonikajanagill.com/ai-devcamp-labs/index.html" target="_blank" rel="noopener" class="upstream-pill">
+        Upstream Labs (Sonika Gill) ↗
+      </a>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">🌗</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-meta">
+        <span class="badge blue">Google Agent Platform</span>
+        <span class="badge yellow">Lab 3: Govern Completed</span>
+        <span>Attendee: <strong>Duncan Moncrieff</strong></span>
+      </div>
+      <h1>Social Spark — Engineering Portfolio &amp; Lab Walkthroughs</h1>
+      <p class="lead">
+        A hands-on implementation, architectural review, and security verification portfolio for <strong>Social Spark</strong> — an autonomous, multi-turn AI social media agent built on the <strong>Google Cloud Agent Development Kit (ADK)</strong> and <strong>Gemini Enterprise Agent Platform</strong>.
+      </p>
+    </section>
+
+    <!-- Platform 4 Pillars Grid -->
+    <h2 style="font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 14px;">The 4 Platform Pillars</h2>
+    <div class="bento">
+
+      <!-- Lab 1: Build -->
+      <a class="tile pillar-build" href="lab-1.html">
+        <div class="kicker">Pillar 1 · Build</div>
+        <div class="title">Lab 1 — Agent Composition &amp; Skills →</div>
+        <div class="desc">
+          Architecture of the ADK agent: prompt chaining, Agent Skills (<code>brand-voice</code>), toolsets (Google Search, SQLite, Buffer), and human-in-the-loop confirmation gating.
+        </div>
+        <div class="meta">
+          <span>Session 1 · Local &amp; Hybrid Execution</span>
+          <span class="badge blue">Completed</span>
+        </div>
+      </a>
+
+      <!-- Lab 2: Scale -->
+      <a class="tile pillar-scale" href="lab-2.html">
+        <div class="kicker">Pillar 2 · Scale</div>
+        <div class="title">Lab 2 — Agent Runtime &amp; Durable Memory →</div>
+        <div class="desc">
+          Deploying to Vertex AI Reasoning Engine with cryptographic Agent Identity, durable multi-turn Sessions, Memory Bank distillation across scale-to-zero cycles, and Cloud Run streaming proxy.
+        </div>
+        <div class="meta">
+          <span>Session 2 · Vertex AI Reasoning Engine</span>
+          <span class="badge green">Completed</span>
+        </div>
+      </a>
+
+      <!-- Lab 3: Govern -->
+      <a class="tile pillar-govern" href="lab-3.html">
+        <div class="kicker">Pillar 3 · Govern</div>
+        <div class="title">Lab 3 — Multi-Layer Guardrails &amp; Network Gateways →</div>
+        <div class="desc">
+          Complete walkthrough of Model Armor, Cloud DLP boundary redaction, Agent Registry semantic tool discovery, Semantic Governance Policies, and Agent Gateway ingress edge defense.
+        </div>
+        <div class="meta">
+          <span>Session 3 · Steps 1–7 Verified + Proof</span>
+          <span class="badge yellow">Complete · In-Depth</span>
+        </div>
+      </a>
+
+      <!-- Lab 4: Optimise -->
+      <div class="tile pillar-optimise" style="opacity: 0.75; cursor: default;">
+        <div class="kicker">Pillar 4 · Optimise</div>
+        <div class="title">Lab 4 — Analytics, Golden Evals &amp; CI/CD</div>
+        <div class="desc">
+          Golden eval regression suites, BigQuery Agent Analytics, Cloud Trace telemetry, and eval-gated automated release pipelines.
+        </div>
+        <div class="meta">
+          <span>Session 4 · Upcoming</span>
+          <span class="badge red">Next Up</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Secondary Bento: Attendee Learnings & Architecture Overview -->
+    <h2 style="font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 14px;">Documentation Hubs</h2>
+    <div class="bento">
+
+      <!-- Attendee Learnings Hub -->
+      <a class="tile span-8" href="learnings.html" style="border-left: 4px solid var(--accent);">
+        <div class="kicker">Engineering Insights</div>
+        <div class="title">Attendee Learnings &amp; Architectural Discoveries →</div>
+        <div class="desc">
+          A curated repository of <strong>20 engineering post-mortems</strong> spanning Build, Scale, and Govern: resolving MCP tool declaration collisions, progressive skill disclosure verification, surviving scale-to-zero memory evictions, avoiding the Principle of Least Astonishment, and verifying policy existence vs. live runtime enforcement.
+        </div>
+        <div class="meta">
+          <span>Distinct from instructor notes in LEARNINGS.md</span>
+          <span style="font-weight: 600; color: var(--accent);">Read Learnings →</span>
+        </div>
+      </a>
+
+      <!-- Upstream Reference -->
+      <a class="tile span-4" href="https://sonikajanagill.com/ai-devcamp-labs/index.html" target="_blank" rel="noopener">
+        <div class="kicker">Upstream Reference</div>
+        <div class="title">Sonika Gill's Labs ↗</div>
+        <div class="desc">
+          Official lab material, starter repo code, original documentation, and instructor notes from Sonika Gill and the DevCamp team.
+        </div>
+        <div class="meta">
+          <span>External Link</span>
+          <span class="upstream-pill">sonikajanagill.com ↗</span>
+        </div>
+      </a>
+
+    </div>
+
+    <!-- System Architecture Diagram Card -->
+    <section class="step-card" style="margin-top: 20px;">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Architecture Overview</span>
+          <h3 class="step-title">Social Spark Production Governance Topology</h3>
+        </div>
+      </div>
+      <div class="step-body">
+        <p style="margin-top: 0; color: var(--muted); font-size: 14px;">
+          The diagram below illustrates how traffic routes through the multi-layer security architecture implemented across Labs 1 through 3:
+        </p>
+        <pre style="line-height: 1.5; font-size: 12px;">
+                                 [External Client / Attackers]
+                                               │
+                       ┌───────────────────────┴───────────────────────┐
+                       │                                               │
+             (Native Protocols)                                 (Web Frontend)
+        streamQuery / MCP / A2A                                     AG-UI
+                       │                                               │
+                       ▼                                               ▼
+         ┌───────────────────────────┐                   ┌───────────────────────────┐
+         │       Agent Gateway       │                   │    Cloud Run Frontend     │
+         │     (agw-social-spark)    │                   │   (social-spark-frontend) │
+         └─────────────┬─────────────┘                   └─────────────┬─────────────┘
+                       │                                               │
+                Service Extension                                  POST /api/adk
+             (Model Armor Ingress)                                     │
+           [failOpen: false / 5s]                                      ▼
+                       │                                 ┌───────────────────────────┐
+            403 on Injection (Edge Drop)                 │     Inbound DLP Filter    │
+                       │                                 │ (pii_middleware: Domestic)│
+                       ▼                                 └─────────────┬─────────────┘
+         ┌───────────────────────────┐                                 │
+         │  Vertex AI Reasoning Eng. │                                 │
+         │  (social-spark-poster)    │◄────────────────────────────────┘
+         ├───────────────────────────┤
+         │ • In-Agent Model Armor    │ ─── Pre-execution callback catches UI injection
+         │ • Human Approval Gate     │ ─── require_confirmation=True prevents unapproved posts
+         │ • Agent Skills & Memory   │ ─── brand-voice, Vertex AI Sessions & Memory Bank
+         │ • Cryptographic Identity  │ ─── principal://agents.global... bound to Governance Policy
+         └─────────────┬─────────────┘
+                       │
+                       ▼
+         ┌───────────────────────────┐
+         │     External Services     │
+         │  (LinkedIn, Buffer, BQ)   │
+         └───────────────────────────┘
+        </pre>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <div>Social Spark Portfolio — GDG London AI DevCamp 2026 · Duncan Moncrieff</div>
+      <div>Maintained in <code>ai-devcamp-labs/docs/walkthrough/</code></div>
+    </footer>
+  </main>
+
+  <script>
+    (function () {
+      var KEY = "social-spark-theme";
+      var root = document.documentElement;
+      var btn = document.getElementById("themeToggle");
+      function showing() {
+        return root.dataset.theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      }
+      if (btn) {
+        btn.addEventListener("click", function () {
+          var next = showing() === "dark" ? "light" : "dark";
+          root.dataset.theme = next;
+          try { localStorage.setItem(KEY, next); } catch (e) {}
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

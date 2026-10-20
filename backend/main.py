@@ -7,11 +7,10 @@ import json
 import logging
 import os
 import pathlib
-import re
 
 from ag_ui_adk import ADKAgent, add_adk_fastapi_endpoint
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from google.adk.memory import VertexAiMemoryBankService
@@ -21,11 +20,51 @@ log = logging.getLogger(__name__)
 
 load_dotenv(pathlib.Path(__file__).parent / "social_poster" / ".env")
 
+# --- Agent Identity tokens ---------------------------------------------------------
+# With Agent Identity, google-auth asks for tokens bound to the agent's mTLS
+# certificate once that certificate is mounted. gRPC clients (Gemini, Secret
+# Manager, Sessions, Memory Bank) present the certificate; plain-HTTP clients
+# (google-cloud-storage in upload_image, httpx to DLP) don't, so they got
+# intermittent "401 Invalid Credentials" (intermittent because tokens fetched
+# before the certificate appears are unbound). Opting out gives unbound tokens
+# for every client. Trade-off: a leaked token isn't tied to this agent's
+# certificate. Set the variable to "true" on the deployment to keep binding.
 if os.environ.get("APP_URL"):
     os.environ.setdefault("GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES", "false")
 
-from backend.social_poster import db  # noqa: E402  (needs .env first)
+# --- Telemetry -------------------------------------------------------------------
+# ADK records traces either way, but something has to export them. ADK's own
+# server and the agents-cli template do that when the deploy sets
+# GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY; this app is hand-built, so it does
+# it itself, the same way. Without it Cloud Trace stays empty and the console
+# dashboard's "Reported by agent" tiles read 0. Metrics stay off, as in ADK's
+# server. A telemetry failure is logged, never raised: a deployed agent that
+# raises at import dies before it can log why.
+if os.environ.get("GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY", "").lower() in ("true", "1"):
+    try:
+        import google.auth
+        from google.adk.telemetry.google_cloud import get_gcp_exporters, get_gcp_resource
+        from google.adk.telemetry.setup import maybe_set_otel_providers
+
+        _credentials, _project = google.auth.default()
+        maybe_set_otel_providers(
+            otel_hooks_to_setup=[
+                get_gcp_exporters(
+                    enable_cloud_tracing=True,
+                    enable_cloud_logging=True,
+                    google_auth=(_credentials, _project),
+                )
+            ],
+            otel_resource=get_gcp_resource(_project),
+        )
+        log.info("Exporting OpenTelemetry traces and logs to Google Cloud")
+    except Exception:
+        log.exception("Telemetry export not set up; the agent runs without it")
+
+from backend.social_poster import config, db  # noqa: E402  (needs .env first)
 from backend.social_poster.agent import root_agent  # noqa: E402  (needs .env first)
+from backend.social_poster import guardrails  # noqa: E402
+from backend.pii_middleware import RedactUserMessages  # noqa: E402  (imports guardrails)
 
 app = FastAPI(title="social-agent AG-UI backend")
 
@@ -36,35 +75,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_APP_URL_FULL_RE = re.compile(
-    r"/projects/(?P<project>[^/]+)/locations/(?P<location>[^/]+)"
-    r"/reasoningEngines/(?P<engine>\d+)"
-)
+# --- Managed session + memory services ----------------------------------------
+# ag_ui_adk defaults to InMemorySessionService and InMemoryMemoryService, which
+# are fine locally but lose everything when the container goes away — and on
+# Agent Runtime with min_instances=0 that happens on every scale-to-zero, not
+# just a redeploy. Deployed, both are backed by the Agent Engine instead.
+#
+# The engine discovers its own identity from the APP_URL that Agent Runtime
+# injects (see config.resolve_agent_engine), so nothing needs configuring by
+# hand. Locally there is no APP_URL, so both fall back and `uv run uvicorn`
+# behaves exactly as it did before.
+_engine = config.resolve_agent_engine()
 
-app_url = os.environ.get("APP_URL", "").strip()
-match = _APP_URL_FULL_RE.search(app_url) if app_url else None
-
-if match:
-    project = match.group("project")
-    location = match.group("location")
-    engine_id = match.group("engine")
+if _engine:
+    # Passing agent_engine_id explicitly means app_name stays a readable name
+    # rather than having to be the numeric engine id.
     session_service = VertexAiSessionService(
-        project=project,
-        location=location,
-        agent_engine_id=engine_id,
+        project=_engine["project"],
+        location=_engine["location"],
+        agent_engine_id=_engine["engine"],
     )
+    # Memory Bank: the managed alternative to this project's hand-rolled
+    # memory_agent (a RemoteA2aAgent over a separate RAG service — see
+    # docs/agent-engine-rag-setup.md). This only makes memory *searchable*.
+    # ag_ui_adk's "automatic" ingestion runs on session cleanup, which a
+    # scale-to-zero engine never reaches, so agent.py ingests explicitly at
+    # publish time (add_session_to_memory, awaited). What the bank extracts is
+    # configured on the engine: backend/memory_bank_config.py.
     memory_service = VertexAiMemoryBankService(
-        project=project,
-        location=location,
-        agent_engine_id=engine_id,
+        project=_engine["project"],
+        location=_engine["location"],
+        agent_engine_id=_engine["engine"],
     )
+    # ag_ui_adk deletes sessions idle for 20 minutes from the session service
+    # itself — here that's the managed store, so conversations vanished from
+    # the console's Sessions tab. Managed sessions expire on their own.
     delete_idle_sessions = False
-    log.info("Using VertexAiSessionService and VertexAiMemoryBankService on engine %s", engine_id)
+    log.info("Managed sessions + Memory Bank on engine %s", _engine["engine"])
 else:
-    session_service = None
+    session_service = None  # ag_ui_adk falls back to its in-memory services
     memory_service = None
-    delete_idle_sessions = True
-    log.info("Using in-memory session service")
+    delete_idle_sessions = True  # frees memory; nothing outlives the process anyway
+    log.info("In-memory sessions and memory — neither survives a restart")
 
 adk_agent = ADKAgent(
     adk_agent=root_agent,
@@ -75,7 +127,27 @@ adk_agent = ADKAgent(
     delete_session_on_cleanup=delete_idle_sessions,
 )
 
+if guardrails.MA_TEMPLATE:
+    # Model Armor's inline screening is SKIPPED for streaming Gemini calls: with
+    # the adapter's default SSE streaming an injection sails through with no
+    # block and no error (verified 2026-09-21: 3/3 streamed calls passed, the
+    # non-streamed ones were blocked). So a guarded agent must not stream. The
+    # cost is that replies arrive whole instead of token by token.
+    from google.adk.agents.run_config import StreamingMode
+
+    def _non_streaming_run_config(run_input):
+        cfg = ADKAgent._default_run_config(adk_agent, run_input)
+        cfg.streaming_mode = StreamingMode.NONE
+        return cfg
+
+    adk_agent._run_config_factory = _non_streaming_run_config
+    log.info("Model Armor is on: streaming disabled so inline screening applies")
+
 add_adk_fastapi_endpoint(app, adk_agent, path="/api/adk")
+
+if guardrails.PII_REDACTION:
+    app.add_middleware(RedactUserMessages, path="/api/adk")
+    log.info("PII redaction on: user messages are de-identified before they reach the agent")
 
 # The console Playground and `reasoningEngines:streamQuery` call the runtime contract's
 # native streaming route, which a container has to serve itself (the AG-UI route above is
@@ -103,10 +175,19 @@ def _get_native_runner():
 
 @app.post("/api/stream_reasoning_engine")
 @app.post("/stream_reasoning_engine")
-async def stream_reasoning_engine(payload: dict):
+async def stream_reasoning_engine(request: Request):
     from fastapi.responses import JSONResponse, StreamingResponse
     from google.adk.agents.run_config import RunConfig, StreamingMode
     from google.genai import types
+
+    try:
+        payload = await request.json()
+    except Exception:
+        try:
+            body = await request.body()
+            payload = json.loads(body.decode("utf-8")) if body else {}
+        except Exception:
+            payload = {}
 
     log.info("stream_reasoning_engine incoming payload: %s", payload)
     args = payload.get("input") or {}
@@ -123,39 +204,58 @@ async def stream_reasoning_engine(payload: dict):
         log.error("No message found in payload: %s", payload)
         return JSONResponse({"error": "input.message or input.query is required"}, status_code=400)
 
-    if isinstance(raw_message, dict):
+    if isinstance(raw_message, str):
+        if guardrails.PII_REDACTION:
+            try:
+                raw_message = guardrails.redact_boundary(raw_message)
+            except Exception:
+                log.exception("PII redaction failed; refusing the request")
+                return JSONResponse({"error": "PII redaction is unavailable, so the request was refused."}, status_code=503)
+        content = types.Content(role="user", parts=[types.Part(text=raw_message)])
+    elif isinstance(raw_message, dict):
         try:
             content = types.Content.model_validate(raw_message)
         except Exception:
             text = raw_message.get("text") or str(raw_message)
+            if guardrails.PII_REDACTION:
+                try:
+                    text = guardrails.redact_boundary(text)
+                except Exception:
+                    log.exception("PII redaction failed; refusing the request")
+                    return JSONResponse({"error": "PII redaction is unavailable, so the request was refused."}, status_code=503)
             content = types.Content(role="user", parts=[types.Part(text=text)])
-    elif isinstance(raw_message, str):
-        content = types.Content(role="user", parts=[types.Part(text=raw_message)])
     else:
-        content = types.Content(role="user", parts=[types.Part(text=str(raw_message))])
+        text = str(raw_message)
+        if guardrails.PII_REDACTION:
+            try:
+                text = guardrails.redact_boundary(text)
+            except Exception:
+                log.exception("PII redaction failed; refusing the request")
+                return JSONResponse({"error": "PII redaction is unavailable, so the request was refused."}, status_code=503)
+        content = types.Content(role="user", parts=[types.Part(text=text)])
 
     runner = _get_native_runner()
     user_id = args.get("user_id") or payload.get("user_id") or "devcamp-user"
-    session_id = args.get("session_id") or payload.get("session_id")
+    raw_session = args.get("session_id") or payload.get("session_id")
+    session_id = raw_session.split("/")[-1] if raw_session else None
+
     session = None
     if session_id:
         try:
             session = await runner.session_service.get_session(
-                app_name="social_poster", user_id=user_id, session_id=session_id
-            )
+                app_name="social_poster", user_id=user_id, session_id=session_id)
         except Exception:
             session = None
     if session is None:
         session = await runner.session_service.create_session(app_name="social_poster", user_id=user_id)
 
-    cfg = RunConfig(streaming_mode=StreamingMode.SSE)
+    # Same reason as the AG-UI route: streamed Gemini calls skip Model Armor.
+    cfg = RunConfig(streaming_mode=StreamingMode.NONE if guardrails.MA_TEMPLATE else StreamingMode.SSE)
 
     async def lines():
         try:
             async for event in runner.run_async(
-                user_id=user_id,
-                session_id=session.id,
-                run_config=cfg,
+                user_id=user_id, session_id=session.id, run_config=cfg,
                 new_message=content,
             ):
                 yield json.dumps({"output": event.model_dump(mode="json", exclude_none=True)}) + "\n"
@@ -181,7 +281,9 @@ def healthz() -> dict:
 
 @app.get("/api/posts")
 def posts() -> dict:
-    """Published posts (with whatever image they used), read from the local
-    SQLite store — durable across reloads/restarts, unlike ADK session state
-    or the browser's own chat history."""
+    """Published posts, with whatever image they used.
+
+    Durable storage, unlike ADK session state or the browser's own chat
+    history: SQLite locally, one object per post in GCS when deployed (a
+    container filesystem does not survive a scale-to-zero). See db.py."""
     return {"posts": db.list_posts()}
