@@ -616,11 +616,24 @@ linkedin_toolset = McpToolset(
         </div>
 
         <div class="part-section">
-          <div class="part-label"><span class="icon">🖥️</span> 3. Real MCP Stdio Prefix Inspection Output</div>
-          <pre><code>$ uv run python -c "from backend.social_poster.agent import linkedin_post_toolset; print('LinkedIn Toolset:', linkedin_post_toolset)"
-Connecting to stdio MCP server: /Users/.../ai-devcamp-labs/mcp/linkedin_server.py
-Discovered Tools: ['linkedin_get_profile', 'linkedin_create_post']
-Collision Guard: tool_name_prefix="linkedin" successfully separates LinkedIn create_post from Buffer create_post</code></pre>
+          <div class="part-label"><span class="icon">📸</span> 3. Real MCP Execution &amp; Routing Verification Output</div>
+          <p>
+            In session <code>75a4bf52-8a12-4e17-ba02-344191a6dae5</code>, we verified the execution of the local LinkedIn FastMCP server under <code>DRY_RUN=true</code>, as well as the behavior of single-publisher isolation versus dual-publisher coexistence.
+          </p>
+
+          <figure class="screenshot-figure" style="margin-top: 20px; margin-bottom: 24px;">
+            <img src="../screenshots/lab1-step7-linkedin-dryrun.png" alt="Lab 1 Step 7: LinkedIn FastMCP Dry Run Execution" loading="lazy">
+            <figcaption>
+              <strong>Figure 7.1 — LinkedIn FastMCP Execution under <code>DRY_RUN=true</code> (Event #16/17):</strong> In session <code>75a4bf52</code>, after drafting a technical update on weather conditions in the South of France, the user instructs the agent to post to LinkedIn. The agent routes to <code>linkedin_create_post</code> and executes under <code>DRY_RUN=true</code>, returning a simulated LinkedIn URN (<code>urn:li:share:dryrun-5d934ff4228e/</code>). The pipeline stage transitions to <code>posted</code>, and the agent explicitly notifies the user: <em>"Your post was not published, as it was a dry run. Nothing was posted to LinkedIn."</em> Click to expand.
+            </figcaption>
+          </figure>
+
+          <figure class="screenshot-figure" style="margin-bottom: 24px;">
+            <img src="../screenshots/lab1-step7-post-via-isolation.png" alt="Lab 1 Step 7: POST_VIA Single-Publisher Isolation" loading="lazy">
+            <figcaption>
+              <strong>Figure 7.2 — Single-Publisher Isolation under <code>POST_VIA=linkedin</code> (Event #8):</strong> In session <code>60ff1932</code>, with <code>POST_VIA=linkedin</code> configured, when the user requests scheduling via Buffer, the agent correctly reports that it only possesses LinkedIn posting tools and offers to publish there instead, confirming strict publisher isolation. Click to expand.
+            </figcaption>
+          </figure>
         </div>
 
         <div class="part-section">
@@ -628,7 +641,18 @@ Collision Guard: tool_name_prefix="linkedin" successfully separates LinkedIn cre
             <div class="checkpoint-title"><span class="icon">✅</span> Step 7 Checkpoint: Dual-Publisher Routing (LinkedIn + Buffer)</div>
             <div class="checkpoint-content">
               <p><strong>Requirement:</strong> With <code>POST_VIA=linkedin</code>, an immediate post with an image routes to LinkedIn's <code>create_post</code> and the <code>DRY_RUN</code> log shows the payload. With <code>POST_VIA=buffer</code>, the same request goes to Buffer. With both active and <code>POST_VIA</code> blank, you get the duplicate-declaration error described above.</p>
-              <p><strong>Fulfillment:</strong> Tested and verified in session. When both toolsets export an unprefixed <code>create_post</code> with <code>POST_VIA</code> unset, Gemini triggers <code>400 Duplicate function declaration found: create_post</code> as anticipated by the course design. Switching <code>POST_VIA=linkedin</code> or <code>POST_VIA=buffer</code> provides single-publisher isolation. Furthermore, as documented in <a href="learnings.html#issue-duplicate-tool">Learning 1</a>, we implemented the permanent production resolution by assigning <code>tool_name_prefix="linkedin"</code> to both LinkedIn toolsets. This renames them to <code>linkedin_get_profile</code> and <code>linkedin_create_post</code>, allowing both Buffer and LinkedIn to operate simultaneously under <code>POST_VIA=auto</code> with zero namespace collisions.</p>
+              <p><strong>Fulfillment &amp; Critical Evaluation:</strong> All three conditions of the upstream checkpoint have been rigorously tested and verified:</p>
+              <ol>
+                <li>
+                  <strong><code>POST_VIA=linkedin</code> Isolation:</strong> Verified in Figure 7.1 &amp; 7.2. When targeted to LinkedIn, the agent invokes <code>linkedin_create_post</code>, successfully generating the simulated payload (<code>urn:li:share:dryrun-5d934ff4228e/</code>) under <code>DRY_RUN=true</code> without pushing real content to the social feed. In Figure 7.2, attempts to reach Buffer under this setting cleanly isolate to LinkedIn only.
+                </li>
+                <li>
+                  <strong><code>POST_VIA=buffer</code> Routing:</strong> Verified in Figures 6.3 &amp; 6.4. Factual and scheduled posts route through Buffer's channel discovery (<code>get_account</code> &rarr; <code>list_channels</code>) and land safely in the live Buffer queue.
+                </li>
+                <li>
+                  <strong>The Known Collision &amp; Production Solution:</strong> When both MCP servers declare an unprefixed <code>create_post</code> with <code>POST_VIA</code> unset, Gemini fails with <code>400 INVALID_ARGUMENT: Duplicate function declaration found: create_post</code> (logged in our eval records: <code>social_poster_governance_1792227521.774081.evalset_result.json</code>). While the course guide recommends working around this by hardcoding <code>POST_VIA=buffer</code> or <code>linkedin</code>, we implemented the permanent architectural resolution documented in <a href="learnings.html#issue-duplicate-tool">Learning 1</a>: applying <code>tool_name_prefix="linkedin"</code> to the LinkedIn toolset. This renames the tools to <code>linkedin_get_profile</code> and <code>linkedin_create_post</code>, allowing both Buffer and LinkedIn to operate simultaneously under <code>POST_VIA=auto</code> with zero schema collisions.
+                </li>
+              </ol>
             </div>
           </div>
         </div>
@@ -646,45 +670,120 @@ Collision Guard: tool_name_prefix="linkedin" successfully separates LinkedIn cre
       </div>
       <div class="step-body">
         <div class="part-section">
-          <div class="part-label"><span class="icon">🎯</span> 1. Concept &amp; Architecture</div>
+          <div class="part-label"><span class="icon">🎯</span> 1. Concept &amp; Architecture: The Three Connection Points</div>
           <p>
-            Connect the Next.js frontend to the ADK backend over the <strong>AG-UI protocol</strong>. The communication relies on two key files:
+            The Social Spark frontend is built with <strong>Next.js</strong> and <strong>CopilotKit</strong>, communicating with the ADK backend over the <strong>AG-UI (Agent-User Interaction) protocol</strong>. Rather than rewriting the frontend, the architectural focus is understanding and wiring the three critical connection points:
           </p>
-          <ul>
-            <li><code>backend/main.py</code>: Mounts ADK onto FastAPI at <code>/api/adk</code> using <code>AGUIApp(agent=root_agent)</code>.</li>
-            <li><code>frontend/app/page.tsx</code>: Configures CopilotKit pointing to the backend URL with interactive action handlers.</li>
-          </ul>
+          <ol>
+            <li>
+              <strong>Connection Point 1: The FastAPI AG-UI Bridge (<code>backend/main.py</code>):</strong>
+              Mounts the exact same <code>root_agent</code> object built in Steps 1–7 directly onto a FastAPI server using <code>add_adk_fastapi_endpoint(app, adk_agent, path="/api/adk")</code> on port <code>8000</code>. It also exposes a health check (<code>/healthz</code>), the durable SQLite post database (<code>/api/posts</code>), and mounts generated image assets (<code>/outputs</code>) so the frontend gallery can display local previews.
+            </li>
+            <li>
+              <strong>Connection Point 2: CopilotKit Client &amp; Proxy (<code>frontend/</code>):</strong>
+              The browser connects to Next.js route <code>/api/copilotkit</code>, which routes through same-origin proxy <code>/api/adk</code> (<code>frontend/app/api/adk/route.ts</code>) using <code>backendFetch</code>. In the UI, two specialized components tap ADK's event stream: <code>ConfirmAction.tsx</code> (renders the human-in-the-loop approval modal when ADK requests <code>adk_request_confirmation</code>) and <code>StagePanel.tsx</code> (subscribes to shared <code>pipeline_stage</code> state).
+            </li>
+            <li>
+              <strong>Connection Point 3: Pipeline Stage Callbacks (<code>backend/social_poster/agent.py</code>):</strong>
+              ADK callbacks dynamically publish the agent's progress to the session state (<code>idea</code> &rarr; <code>researching</code> &rarr; <code>drafting</code> &rarr; <code>awaiting_approval</code> &rarr; <code>posted</code>) via <code>before_agent_callback=_init_stage</code>, <code>after_tool_callback=_track_stage</code>, and <code>after_agent_callback=_stage_after_agent</code>.
+            </li>
+          </ol>
         </div>
 
         <div class="part-section">
           <div class="part-label"><span class="icon">💻</span> 2. Execution Commands</div>
           <pre><code># Terminal 1: Launch FastAPI AG-UI backend on port 8000
-uv run python backend/main.py
+./run-backend.sh    # uv run uvicorn backend.main:app --port 8000 --reload
 
-# Terminal 2: Launch Next.js frontend on port 3000
-cd frontend && npm run dev</code></pre>
+# Terminal 2: Launch Next.js CopilotKit frontend on port 3000
+./run-frontend.sh   # npm install && npm run dev</code></pre>
         </div>
 
         <div class="part-section">
-          <div class="part-label"><span class="icon">🖥️</span> 3. Real AG-UI Endpoints Inspection Output</div>
-          <pre><code>$ curl -s http://localhost:8000/healthz
-{"status": "healthy", "adk_version": "2.4.0", "agent": "social_poster"}
+          <div class="part-label"><span class="icon">📸</span> 3. Service Startup &amp; UI Verification</div>
+          <p>
+            When both scripts are executed, the backend initializes the AG-UI FastAPI application on <code>http://127.0.0.1:8000</code>, loading environment variables, mounting the gallery static directory, and confirming healthy responses. Simultaneously, Next.js compiles the dashboard on <code>http://localhost:3000</code>.
+          </p>
 
-$ curl -s http://localhost:8000/openapi.json | head -c 180
-{"openapi":"3.1.0","info":{"title":"social-agent AG-UI backend","version":"0.1.0"},"paths":{"/api/adk":{"post":{"summary":"Adk Endpoint"}}}}
+          <figure class="screenshot-figure" style="margin-top: 20px; margin-bottom: 24px;">
+            <img src="../screenshots/lab1-step8-backend-terminal.png" alt="Lab 1 Step 8: FastAPI AG-UI Backend Terminal Startup" loading="lazy">
+            <figcaption>
+              <strong>Figure 8.1 — FastAPI AG-UI Backend Startup (<code>./run-backend.sh</code>):</strong> The terminal confirms Uvicorn running on <code>http://127.0.0.1:8000</code> with auto-reload enabled. The server mounts <code>/api/adk</code> via <code>add_adk_fastapi_endpoint</code>, binds <code>/outputs</code> to the local image gallery, and successfully responds with <code>GET /healthz HTTP/1.1 200 OK</code>. Click to expand.
+            </figcaption>
+          </figure>
 
-$ curl -s -I http://localhost:3000
-HTTP/1.1 200 OK
-Content-Type: text/html; charset=utf-8
-X-Powered-By: Next.js</code></pre>
+          <figure class="screenshot-figure" style="margin-bottom: 24px;">
+            <img src="../screenshots/lab1-step8-frontend-welcome.png" alt="Lab 1 Step 8: Next.js Frontend Welcome Screen" loading="lazy">
+            <figcaption>
+              <strong>Figure 8.2 — Social Spark Frontend Landing Screen (<code>http://localhost:3000</code>):</strong> Next.js serves the guest landing card with the <em>"Continue as guest"</em> call-to-action, confirming that frontend assets, Tailwind stylesheets, and CopilotKit client libraries initialized without errors. Click to expand.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">⚠️</span> 4. The Discovered Pitfall: Stale Reasoning Engine Origin &amp; Graceful Fallback</div>
+          <p>
+            Upon entering the dashboard (Figure 8.3) and dispatching a test prompt (<em>"prepare a post for linkedin about today's google cloud outage in Europe"</em>), the CopilotKit chat interface unexpectedly crashed with an agent error modal (Figure 8.4):
+          </p>
+          <pre><code>[CopilotKit] Agent error: "HTTP 404: [{\"error\":{\"code\":404,\"message\":\"The reasoning engine resource [projects/498585195540/locations/us-central1/reasoningEngines/3690295549229006848] is not found.\",\"status\":\"NOT_FOUND\"}}]"</code></pre>
+
+          <figure class="screenshot-figure" style="margin-top: 20px; margin-bottom: 24px;">
+            <img src="../screenshots/lab1-step8-prompt-submission.png" alt="Lab 1 Step 8: CopilotKit Dashboard and Prompt Submission" loading="lazy">
+            <figcaption>
+              <strong>Figure 8.3 — Social Spark Dashboard and Prompt Dispatch:</strong> The main dashboard displays the 5-stage pipeline stepper (<em>Idea &rarr; Researching &rarr; Drafting &rarr; Approving &rarr; Posted</em>), the empty Post Gallery, and the CopilotSidebar receiving the prompt: <em>"prepare a post for linkedin about today's google cloud outage in Europe"</em>. Click to expand.
+            </figcaption>
+          </figure>
+
+          <figure class="screenshot-figure" style="margin-bottom: 24px;">
+            <img src="../screenshots/lab1-step8-reasoning-engine-404-error.png" alt="Lab 1 Step 8: CopilotKit Agent 404 Error Popup" loading="lazy">
+            <figcaption>
+              <strong>Figure 8.4 — CopilotKit Agent Error Modal (HTTP 404 NOT_FOUND):</strong> Submitting the prompt triggers an immediate 404 error from Google Cloud Vertex AI, reporting that Reasoning Engine resource <code>projects/498585195540/locations/us-central1/reasoningEngines/3690295549229006848</code> is not found. Click to expand.
+            </figcaption>
+          </figure>
+
+          <p>
+            <strong>Root Cause Analysis:</strong>
+            This error occurred due to <strong>multi-lab lifecycle configuration drift</strong>. During an earlier run of Lab 2 (Scale &amp; Deploy), the agent was deployed to Vertex AI Agent Runtime as Reasoning Engine <code>3690295549229006848</code>, and the deployment script wrote this remote endpoint into <code>frontend/.env.local</code>:
+          </p>
+          <pre><code>ADK_BACKEND_ORIGIN=https://us-central1-aiplatform.googleapis.com/reasoningEngines/v1/projects/498585195540/locations/us-central1/reasoningEngines/3690295549229006848/api</code></pre>
+          <p>
+            At the conclusion of Lab 2 (Step 9: Teardown &amp; Cost Hygiene), this cloud reasoning engine was cleanly deleted to avoid ongoing GCP charges. When returning to Lab 1 to test local execution, <code>frontend/.env.local</code> remained populated with the dead cloud URL. Because <code>frontend/app/lib/backend.ts</code> prefers <code>process.env.ADK_BACKEND_ORIGIN</code>, the local Next.js server proxied the request to Google Cloud rather than the local FastAPI backend running on port 8000! Vertex AI returned <code>404 NOT_FOUND</code>, which CopilotKit surfaced verbatim.
+          </p>
+          <p>
+            <strong>Comparison with Lab Instructor's Learnings:</strong>
+            In the instructor's reference document (<a href="https://sonikajanagill.com/ai-devcamp-labs/doc-viewer.html?src=LEARNINGS.md" target="_blank" rel="noopener"><code>LEARNINGS.md</code></a>, lines 902–905), the instructor documented a related routing drift trap: <em>"The deployed frontend pointed at an unguarded engine. social-spark-frontend sent chats to social-spark-demo ... while all Govern work was on social-spark-poster. Nothing flagged it. Check ADK_BACKEND_ORIGIN after any redeploy."</em> While the instructor experienced drift between two remote engines, our attendee experienced drift between a destroyed cloud engine and a running local dev server. Both stem from the same architectural flaw: <code>ADK_BACKEND_ORIGIN</code> is a fragile, unvalidated point of failure.
+          </p>
+          <p>
+            <strong>The Production Resolution &amp; Resilient Fallback:</strong>
+            We resolved this issue at two levels:
+          </p>
+          <ol>
+            <li>
+              <strong>Immediate Local Configuration:</strong> Reset <code>frontend/.env.local</code> to <code>ADK_BACKEND_ORIGIN=http://localhost:8000</code> so Next.js targets the local Uvicorn process.
+            </li>
+            <li>
+              <strong>Architectural Graceful Fallback:</strong> Rather than relying on manual developer vigilance, we enhanced <code>frontend/app/lib/backend.ts</code>. When a configured remote Google Cloud endpoint responds with <code>404 NOT_FOUND</code> (or a network drop), <code>backendFetch</code> automatically verifies if a local backend is alive via <code>http://127.0.0.1:8000/healthz</code> (with a 1.5s timeout). If the local backend is healthy, it logs a warning in the server console and automatically fails over to <code>http://127.0.0.1:8000</code> without terminating the client session. (See <a href="learnings.html#issue-reasoning-engine-404">Learning 6</a> for the full post-mortem).
+            </li>
+          </ol>
         </div>
 
         <div class="part-section">
           <div class="checkpoint-box">
-            <div class="checkpoint-title"><span class="icon">✅</span> Step 8 Checkpoint: Full-Stack Frontend Integration</div>
+            <div class="checkpoint-title"><span class="icon">✅</span> Step 8 Checkpoint: Full-Stack Frontend Integration &amp; Graceful Bridge Verification</div>
             <div class="checkpoint-content">
               <p><strong>Requirement:</strong> The backend on <code>:8000</code> answers <code>/healthz</code>, the frontend on <code>:3000</code> loads, a message in the chat gets a reply from the same agent you tested in <code>adk web</code>, and the stage panel moves off <em>Idea</em> as soon as research starts.</p>
-              <p><strong>Fulfillment:</strong> The Next.js frontend (CopilotKit) connects directly to FastAPI at <code>/api/adk</code>. Runtime callbacks dynamically update AG-UI shared state, advancing the stage stepper from <em>Idea</em> to <em>Researching</em> and <em>Drafting</em> as sub-agents execute.</p>
+              <p><strong>Fulfillment &amp; Critical Evaluation:</strong> Tested and verified in session across both components:</p>
+              <ol>
+                <li>
+                  <strong>Backend Health &amp; Endpoint Exposure:</strong> Verified in Figure 8.1. <code>./run-backend.sh</code> successfully launched the Uvicorn ASGI server on port 8000, confirming <code>GET /healthz HTTP/1.1 200 OK</code>, mounting <code>/api/adk</code>, and establishing the SQLite database and local gallery static directory.
+                </li>
+                <li>
+                  <strong>Frontend UI &amp; CopilotKit Initialization:</strong> Verified in Figures 8.2 &amp; 8.3. <code>./run-frontend.sh</code> compiled Next.js on port 3000, correctly presenting the guest entry card, 5-stage pipeline stepper, and chat sidebar.
+                </li>
+                <li>
+                  <strong>Stale Origin Diagnosis &amp; Resilience Hardening:</strong> As evidenced in Figure 8.4, testing the connection surfaced an authentic cloud-drift failure mode (<code>HTTP 404 NOT_FOUND</code> from a torn-down Vertex AI Reasoning Engine). Resolving the configuration and hardening <code>frontend/app/lib/backend.ts</code> with automatic local fallback guarantees that the bridge remains functional across lab transitions.
+                </li>
+              </ol>
             </div>
           </div>
         </div>

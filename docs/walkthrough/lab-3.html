@@ -320,7 +320,7 @@ uv run python backend/pii_middleware.py --test-international
                   <strong>High-Recall Boundary Strategy:</strong> Cloud DLP relies on probabilistic pattern recognition (regular expressions, checksums, and surrounding context dictionaries). In boundary data governance, the operational priority is <strong>maximizing recall</strong> (zero PII leaks into persistent logs/memory) over precision. A false positive (redacting an internal sku) causes minor phrasing awkwardness; a false negative (persisting a customer's phone number or medical ID in the vector session database) is a GDPR violation.
                 </li>
                 <li>
-                  <strong>Boundary vs. In-Model Tool Call:</strong> Inbound middleware guarantees redaction before persistence. If PII redaction were left to an LLM tool call, the model context and session store would already contain the unredacted plaintext, exposing it to prompt injection extraction. (See <a href="learnings.html#issue-dlp-domestic">Learning 14</a> for custom regex detectors and <a href="learnings.html#issue-dlp-overscrub">Learning 15</a> on syntactic redaction vs. semantic context).
+                  <strong>Boundary vs. In-Model Tool Call:</strong> Inbound middleware guarantees redaction before persistence. If PII redaction were left to an LLM tool call, the model context and session store would already contain the unredacted plaintext, exposing it to prompt injection extraction. (See <a href="learnings.html#issue-dlp-domestic">Learning 15</a> for custom regex detectors and <a href="learnings.html#issue-dlp-overscrub">Learning 16</a> on syntactic redaction vs. semantic context).
                 </li>
               </ul>
             </div>
@@ -394,7 +394,7 @@ uv run python backend/governance.py registry-search "bigquery"</code></pre>
                   <strong>Unified Telemetry &amp; Dependency Mapping:</strong> All discovery queries, tool callouts, and security violations are linked to the registered Agent Identity across Cloud Logging, Cloud Trace, and Google Cloud Security Command Center.
                 </li>
                 <li>
-                  <strong>Cryptographic Identity Verification:</strong> A wiki page can be edited by any human user. The Registry validates agents via workload identity federation principals (<code>principal://agents.global...</code>). (See <a href="learnings.html#issue-registry-wiki">Learning 17</a> for the detailed architectural comparison between Agent Registry and static wikis).
+                  <strong>Cryptographic Identity Verification:</strong> A wiki page can be edited by any human user. The Registry validates agents via workload identity federation principals (<code>principal://agents.global...</code>). (See <a href="learnings.html#issue-registry-wiki">Learning 18</a> for the detailed architectural comparison between Agent Registry and static wikis).
                 </li>
               </ol>
             </div>
@@ -473,7 +473,7 @@ uv run python backend/governance.py list</code></pre>
                   <strong>What actually blocks unapproved posts today:</strong> If an attacker instructs the agent to bypass human review, <strong>the action is blocked by the application code approval gate (<code>require_confirmation=True</code> in ADK)</strong>, which generates an <code>adk_request_confirmation</code> signal requiring human interaction.
                 </li>
                 <li>
-                  <strong>Why the policy does not actively enforce yet:</strong> Live runtime policy enforcement by the Semantic Governance Engine requires a dedicated enterprise network harness: an Agent Gateway with client-to-agent ingress routing, a dedicated VPC network with Private Service Connect (PSC), and an authorization extension intercepting Gemini <code>:generateContent</code> API calls. Conflating policy existence with runtime enforcement is a major trap in AI governance; existence establishes intent and auditability, but enforcement requires network interception. (Detailed architectural breakdown in <a href="learnings.html#issue-policy-enforce">Learning 18</a>).
+                  <strong>Why the policy does not actively enforce yet:</strong> Live runtime policy enforcement by the Semantic Governance Engine requires a dedicated enterprise network harness: an Agent Gateway with client-to-agent ingress routing, a dedicated VPC network with Private Service Connect (PSC), and an authorization extension intercepting Gemini <code>:generateContent</code> API calls. Conflating policy existence with runtime enforcement is a major trap in AI governance; existence establishes intent and auditability, but enforcement requires network interception. (Detailed architectural breakdown in <a href="learnings.html#issue-policy-enforce">Learning 19</a>).
                 </li>
               </ul>
             </div>

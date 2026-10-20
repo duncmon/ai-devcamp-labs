@@ -54,15 +54,76 @@ export async function googleAuthHeader(): Promise<Record<string, string>> {
   return { Authorization: `Bearer ${token.token}` };
 }
 
-/** fetch() against the backend, adding auth only when the target needs it. */
+const LOCAL_BACKEND = "http://127.0.0.1:8000";
+
+/** fetch() against the backend, adding auth only when the target needs it.
+ * Implements graceful fallback to the local backend if a configured remote
+ * Reasoning Engine returns 404 (e.g. torn down after a previous lab session).
+ */
 export async function backendFetch(
   path: string,
   init: RequestInit = {},
 ): Promise<Response> {
   const url = `${BACKEND_ORIGIN}${path}`;
+  const isRemote = needsGoogleAuth(url);
   const headers: Record<string, string> = {
     ...(init.headers as Record<string, string> | undefined),
-    ...(needsGoogleAuth(url) ? await googleAuthHeader() : {}),
+    ...(isRemote ? await googleAuthHeader() : {}),
   };
-  return fetch(url, { ...init, headers });
+
+  try {
+    const res = await fetch(url, { ...init, headers });
+    // If the remote reasoning engine was deleted/not found (HTTP 404), check if a local backend is alive
+    if (res.status === 404 && isRemote) {
+      try {
+        const localCheck = await fetch(`${LOCAL_BACKEND}/healthz`, {
+          signal: AbortSignal.timeout(1500),
+        });
+        if (localCheck.ok) {
+          console.warn(
+            `[backendFetch] Configured ADK_BACKEND_ORIGIN (${BACKEND_ORIGIN}) returned 404 NOT_FOUND. ` +
+              `Falling back gracefully to local backend at ${LOCAL_BACKEND}${path}.`,
+          );
+          const localHeaders = {
+            ...(init.headers as Record<string, string> | undefined),
+          };
+          delete localHeaders["authorization"];
+          delete localHeaders["Authorization"];
+          return await fetch(`${LOCAL_BACKEND}${path}`, {
+            ...init,
+            headers: localHeaders,
+          });
+        }
+      } catch {
+        // Local backend not reachable; fall through to return original 404
+      }
+    }
+    return res;
+  } catch (err) {
+    if (isRemote) {
+      try {
+        const localCheck = await fetch(`${LOCAL_BACKEND}/healthz`, {
+          signal: AbortSignal.timeout(1500),
+        });
+        if (localCheck.ok) {
+          console.warn(
+            `[backendFetch] Connection to ADK_BACKEND_ORIGIN (${BACKEND_ORIGIN}) failed (${err}). ` +
+              `Falling back gracefully to local backend at ${LOCAL_BACKEND}${path}.`,
+          );
+          const localHeaders = {
+            ...(init.headers as Record<string, string> | undefined),
+          };
+          delete localHeaders["authorization"];
+          delete localHeaders["Authorization"];
+          return await fetch(`${LOCAL_BACKEND}${path}`, {
+            ...init,
+            headers: localHeaders,
+          });
+        }
+      } catch {
+        // fall through
+      }
+    }
+    throw err;
+  }
 }

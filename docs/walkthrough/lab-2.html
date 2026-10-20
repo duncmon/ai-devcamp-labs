@@ -161,7 +161,7 @@ agents-cli deploy --status -d agent_runtime \
             <div class="checkpoint-title"><span class="icon">✅</span> Step 2 Checkpoint: Agent Runtime Deployment</div>
             <div class="checkpoint-content">
               <p><strong>Requirement:</strong> <code>agents-cli deploy --list --project YOUR_PROJECT --no-confirm-project</code> shows <code>social-spark-poster</code> in <code>us-central1</code>, and the agent appears in the console under Agent Engine with an identity principal against it. Running <code>./gcp-setup.sh</code> again ends with <code>Done.</code></p>
-              <p><strong>Fulfillment:</strong> Verified in Figure 2.1. <code>social-spark-poster</code> successfully deployed to Agent Runtime in <code>us-central1</code> as Reasoning Engine <code>3820247796918517760</code>, bound to dedicated Agent Identity principal <code>serviceAccount:social-spark-identity@...</code>. (Detailed model aliasing and regional routing analysis in <a href="learnings.html#issue-model-404">Learning 6</a>).</p>
+              <p><strong>Fulfillment:</strong> Verified in Figure 2.1. <code>social-spark-poster</code> successfully deployed to Agent Runtime in <code>us-central1</code> as Reasoning Engine <code>3820247796918517760</code>, bound to dedicated Agent Identity principal <code>serviceAccount:social-spark-identity@...</code>. (Detailed model aliasing and regional routing analysis in <a href="learnings.html#issue-model-404">Learning 7</a>).</p>
             </div>
           </div>
         </div>
@@ -260,7 +260,7 @@ curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" \
             <div class="checkpoint-title"><span class="icon">✅</span> Step 4 Checkpoint: Durable Sessions</div>
             <div class="checkpoint-content">
               <p><strong>Requirement:</strong> Send a message, then list sessions: yours is there, with your user id against it. Send a second message on the same <code>threadId</code> from a <em>fresh</em> process and the agent still has the context. The real proof: come back after the engine has scaled to zero and the conversation is still there.</p>
-              <p><strong>Fulfillment:</strong> Verified in Figure 4.1. The sessions API confirmed persistent thread storage under user <code>devcamp-user</code>. A second message sent on the same session restored full context after a scale-to-zero cold start. (See <a href="learnings.html#issue-scale-zero-memory">Learning 9</a> on surviving scale-to-zero container evictions).</p>
+              <p><strong>Fulfillment:</strong> Verified in Figure 4.1. The sessions API confirmed persistent thread storage under user <code>devcamp-user</code>. A second message sent on the same session restored full context after a scale-to-zero cold start. (See <a href="learnings.html#issue-scale-zero-memory">Learning 10</a> on surviving scale-to-zero container evictions).</p>
             </div>
           </div>
         </div>

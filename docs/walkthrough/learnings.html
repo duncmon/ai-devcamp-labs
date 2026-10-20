@@ -69,31 +69,32 @@
               <li><a href="#issue-buffer-hitl">3. Dual-Path Side-Effect Gate (Buffer MCP)</a></li>
               <li><a href="#issue-search-mixing">4. Native Search Grounding vs. Custom Tool Mixing</a></li>
               <li><a href="#issue-gcs-preview">5. GCS Image URL Preview vs. Public Access Trap</a></li>
+              <li><a href="#issue-reasoning-engine-404">6. Stale Remote Engine Origin vs. Local AG-UI Bridge</a></li>
             </ul>
           </div>
           <div>
             <strong>Pillar 2 (Scale) Discoveries:</strong>
             <ul style="margin: 6px 0; padding-left: 18px;">
-              <li><a href="#issue-model-404">6. Model Resolution 404 &amp; Regional Routing</a></li>
-              <li><a href="#issue-playground-400">7. Console Playground 400/404 Runtime Contracts</a></li>
-              <li><a href="#issue-hitl-deadlock">8. Console Playground Confirmation Deadlock</a></li>
-              <li><a href="#issue-scale-zero-memory">9. Scale-to-Zero Memory &amp; Session Eviction</a></li>
-              <li><a href="#issue-frontend-auth">10. Frontend ADC Streaming Proxy Architecture</a></li>
-              <li><a href="#issue-secret-trap">11. Secret Manager in Containerized Agent Runtime</a></li>
-              <li><a href="#issue-buffer-delay">12. Buffer Review Delay Safeguard</a></li>
+              <li><a href="#issue-model-404">7. Model Resolution 404 &amp; Regional Routing</a></li>
+              <li><a href="#issue-playground-400">8. Console Playground 400/404 Runtime Contracts</a></li>
+              <li><a href="#issue-hitl-deadlock">9. Console Playground Confirmation Deadlock</a></li>
+              <li><a href="#issue-scale-zero-memory">10. Scale-to-Zero Memory &amp; Session Eviction</a></li>
+              <li><a href="#issue-frontend-auth">11. Frontend ADC Streaming Proxy Architecture</a></li>
+              <li><a href="#issue-secret-trap">12. Secret Manager in Containerized Agent Runtime</a></li>
+              <li><a href="#issue-buffer-delay">13. Buffer Review Delay Safeguard</a></li>
             </ul>
           </div>
           <div>
             <strong>Pillar 3 (Govern) Discoveries:</strong>
             <ul style="margin: 6px 0; padding-left: 18px;">
-              <li><a href="#issue-pola">13. Configuration Anti-Pattern &amp; POLA</a></li>
-              <li><a href="#issue-dlp-domestic">14. Domestic Phone Detection in Cloud DLP</a></li>
-              <li><a href="#issue-dlp-overscrub">15. Syntactic Redaction vs. Semantic Context</a></li>
-              <li><a href="#issue-asgi-loop">16. Pure-ASGI Streaming Disconnect Loop</a></li>
-              <li><a href="#issue-registry-wiki">17. Agent Registry vs. 50-Agent Static Wiki</a></li>
-              <li><a href="#issue-policy-enforce">18. Governance Policy: Existence vs. Enforcement</a></li>
-              <li><a href="#issue-inspect-trap">19. The "Inspect-Only" Trap &amp; Fail-Closed Posture</a></li>
-              <li><a href="#issue-8mb-quota">20. Vertex AI 8MB Payload Quota Trap</a></li>
+              <li><a href="#issue-pola">14. Configuration Anti-Pattern &amp; POLA</a></li>
+              <li><a href="#issue-dlp-domestic">15. Domestic Phone Detection in Cloud DLP</a></li>
+              <li><a href="#issue-dlp-overscrub">16. Syntactic Redaction vs. Semantic Context</a></li>
+              <li><a href="#issue-asgi-loop">17. Pure-ASGI Streaming Disconnect Loop</a></li>
+              <li><a href="#issue-registry-wiki">18. Agent Registry vs. 50-Agent Static Wiki</a></li>
+              <li><a href="#issue-policy-enforce">19. Governance Policy: Existence vs. Enforcement</a></li>
+              <li><a href="#issue-inspect-trap">20. The "Inspect-Only" Trap &amp; Fail-Closed Posture</a></li>
+              <li><a href="#issue-8mb-quota">21. Vertex AI 8MB Payload Quota Trap</a></li>
             </ul>
           </div>
         </div>
@@ -216,10 +217,88 @@
       </div>
     </article>
 
+    <article class="step-card" id="issue-reasoning-engine-404">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 6 · Build</span>
+          <h2 class="step-title">Stale Remote Reasoning Engine Origin vs. Local AG-UI Bridge (<code>HTTP 404 NOT_FOUND</code>)</h2>
+        </div>
+        <span class="badge blue">Build</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> The Observed Error &amp; Multi-Lab Lifecycle Drift</div>
+          <p>
+            During Lab 1 Step 8, after launching both the local FastAPI AG-UI backend (<code>./run-backend.sh</code> on <code>:8000</code>) and the Next.js frontend (<code>./run-frontend.sh</code> on <code>:3000</code>), both servers reported healthy status. However, dispatching any prompt from the CopilotKit chat interface immediately crashed with an unhandled agent error modal:
+          </p>
+          <pre><code>[CopilotKit] Agent error: "HTTP 404: [{\"error\":{\"code\":404,\"message\":\"The reasoning engine resource [projects/498585195540/locations/us-central1/reasoningEngines/3690295549229006848] is not found.\",\"status\":\"NOT_FOUND\"}}]"</code></pre>
+          <p>
+            <strong>Root Cause Analysis:</strong>
+            This error is an authentic consequence of <strong>inter-lab lifecycle state drift</strong>. In Lab 2, the attendee deployed the agent to Vertex AI Agent Runtime as Reasoning Engine <code>3690295549229006848</code>, which wrote that remote cloud URL into <code>frontend/.env.local</code>. At the end of Lab 2 (Step 9: Teardown &amp; Cost Hygiene), that cloud engine was deleted to eliminate ongoing GCP compute billing.
+          </p>
+          <p>
+            When the attendee subsequently executed Lab 1 Step 8 to test the local AG-UI bridge, <code>frontend/.env.local</code> was left holding the stale cloud URL. Next.js server route <code>/api/adk</code> delegates outbound requests to <code>backendFetch</code> in <code>frontend/app/lib/backend.ts</code>, which evaluates <code>process.env.ADK_BACKEND_ORIGIN</code> before falling back to <code>http://localhost:8000</code>. As a result, the Next.js proxy minted a Google Cloud ADC bearer token and forwarded the local chat request to the destroyed Vertex AI Reasoning Engine endpoint in <code>us-central1</code>, receiving an instant <code>404 NOT_FOUND</code>.
+          </p>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">⚖️</span> Comparison with Lab Instructor's Reference Notes</div>
+          <p>
+            In <a href="https://sonikajanagill.com/ai-devcamp-labs/doc-viewer.html?src=LEARNINGS.md" target="_blank" rel="noopener"><code>LEARNINGS.md</code></a> (lines 902–905), the course instructor documented a closely related routing drift failure:
+          </p>
+          <blockquote>
+            <em>"The deployed frontend pointed at an unguarded engine. social-spark-frontend sent chats to social-spark-demo (no Model Armor, no PII redaction, no gateway, POST_VIA=buffer, DRY_RUN=false), while all Govern work was on social-spark-poster. Nothing flagged it. Check ADK_BACKEND_ORIGIN after any redeploy; the runbook has the check."</em>
+          </blockquote>
+          <p>
+            <strong>The Critical Distinction:</strong> The instructor encountered silent routing drift <em>between two remote deployed cloud engines</em> (one governed, one ungoverned), which produced false-positive governance validation. In our attendee run, the drift occurred <em>between local development and a torn-down cloud engine</em>, causing catastrophic service disruption (404 hard crash). However, both failures stem from the exact same architectural defect: <strong><code>ADK_BACKEND_ORIGIN</code> is an invisible, unvalidated configuration point</strong> that drifts silently across development phases. The instructor only suggested adding a manual checklist verification step to runbooks.
+          </p>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🛠️</span> Architectural Solution: Graceful Health Fallback</div>
+          <p>
+            Treating configuration drift solely through documentation checklists violates the Principle of Least Astonishment. We resolved this through two complementary mechanisms:
+          </p>
+          <ol>
+            <li>
+              <strong>Immediate Configuration Alignment:</strong> Updated <code>frontend/.env.local</code> to explicitly define <code>ADK_BACKEND_ORIGIN=http://localhost:8000</code>, with clear comments for switching between local development and future deployed reasoning engines.
+            </li>
+            <li>
+              <strong>Cloud-Native Graceful Fallback in <code>frontend/app/lib/backend.ts</code>:</strong> We upgraded <code>backendFetch</code> with automated fallback intelligence. If <code>ADK_BACKEND_ORIGIN</code> targets a remote Google Cloud endpoint (<code>needsGoogleAuth(url)</code>), and that endpoint returns <code>HTTP 404 NOT_FOUND</code> (or encounters a network failure), <code>backendFetch</code> immediately checks if a local backend is running via <code>http://127.0.0.1:8000/healthz</code> (with a 1.5s timeout). If healthy, it logs a descriptive warning to the developer console and transparently proxies the request to the local backend:
+            </li>
+          </ol>
+          <pre><code>// frontend/app/lib/backend.ts (Graceful Fallback Logic)
+const LOCAL_BACKEND = "http://127.0.0.1:8000";
+
+if (res.status === 404 && isRemote) {
+  try {
+    const localCheck = await fetch(`${LOCAL_BACKEND}/healthz`, {
+      signal: AbortSignal.timeout(1500),
+    });
+    if (localCheck.ok) {
+      console.warn(
+        `[backendFetch] Configured ADK_BACKEND_ORIGIN (${BACKEND_ORIGIN}) returned 404 NOT_FOUND. ` +
+        `Falling back gracefully to local backend at ${LOCAL_BACKEND}${path}.`
+      );
+      const localHeaders = { ...init.headers };
+      delete localHeaders["authorization"];
+      return await fetch(`${LOCAL_BACKEND}${path}`, { ...init, headers: localHeaders });
+    }
+  } catch {
+    // Local backend unreachable; preserve original 404
+  }
+}</code></pre>
+          <p>
+            This architecture prevents developer friction, guarantees zero overhead in production Cloud Run environments, and provides immediate self-healing during local testing if an attendee forgot to clean up their <code>.env.local</code> after tearing down cloud infrastructure.
+          </p>
+        </div>
+      </div>
+    </article>
+
     <article class="step-card" id="issue-model-404">
       <div class="step-header">
         <div>
-          <span class="step-num">Learning 6 · Scale</span>
+          <span class="step-num">Learning 7 · Scale</span>
           <h2 class="step-title">Vertex AI Model Resolution 404 &amp; Regional Routing</h2>
         </div>
         <span class="badge green">Scale</span>
@@ -243,7 +322,7 @@
     <article class="step-card" id="issue-playground-400">
       <div class="step-header">
         <div>
-          <span class="step-num">Learning 7 · Scale</span>
+          <span class="step-num">Learning 8 · Scale</span>
           <h2 class="step-title">Console Playground Runtime Contracts (400, 404, 422 Errors)</h2>
         </div>
         <span class="badge green">Scale</span>
@@ -267,7 +346,7 @@
     <article class="step-card" id="issue-hitl-deadlock">
       <div class="step-header">
         <div>
-          <span class="step-num">Learning 8 · Scale</span>
+          <span class="step-num">Learning 9 · Scale</span>
           <h2 class="step-title">Console Playground Tool Confirmation Deadlock</h2>
         </div>
         <span class="badge green">Scale</span>
@@ -291,7 +370,7 @@
     <article class="step-card" id="issue-scale-zero-memory">
       <div class="step-header">
         <div>
-          <span class="step-num">Learning 9 · Scale</span>
+          <span class="step-num">Learning 10 · Scale</span>
           <h2 class="step-title">Scale-to-Zero Memory &amp; Session Eviction</h2>
         </div>
         <span class="badge green">Scale</span>
@@ -315,7 +394,7 @@
     <article class="step-card" id="issue-frontend-auth">
       <div class="step-header">
         <div>
-          <span class="step-num">Learning 10 · Scale</span>
+          <span class="step-num">Learning 11 · Scale</span>
           <h2 class="step-title">Frontend Authentication to Agent Runtime &amp; Token Security</h2>
         </div>
         <span class="badge green">Scale</span>
@@ -336,7 +415,7 @@
     <article class="step-card" id="issue-secret-trap">
       <div class="step-header">
         <div>
-          <span class="step-num">Learning 11 · Scale</span>
+          <span class="step-num">Learning 12 · Scale</span>
           <h2 class="step-title">Secret Manager in Containerized Agent Runtime</h2>
         </div>
         <span class="badge green">Scale</span>
@@ -357,7 +436,7 @@
     <article class="step-card" id="issue-buffer-delay">
       <div class="step-header">
         <div>
-          <span class="step-num">Learning 12 · Scale</span>
+          <span class="step-num">Learning 13 · Scale</span>
           <h2 class="step-title">Buffer Review Delay Safeguard (<code>BUFFER_REVIEW_DELAY_MINUTES</code>)</h2>
         </div>
         <span class="badge green">Scale</span>
@@ -378,7 +457,7 @@
     <article class="step-card" id="issue-pola">
       <div class="step-header">
         <div>
-          <span class="step-num">Learning 13 · Govern</span>
+          <span class="step-num">Learning 14 · Scale</span>
           <h2 class="step-title">Configuration Resolution Anti-Pattern &amp; The Principle of Least Astonishment</h2>
         </div>
         <span class="badge yellow">Govern</span>
@@ -493,7 +572,7 @@ if not PROJECT:
     <article class="step-card" id="issue-dlp-domestic">
       <div class="step-header">
         <div>
-          <span class="step-num">Learning 14 · Govern</span>
+          <span class="step-num">Learning 15 · Govern</span>
           <h2 class="step-title">Cloud DLP Telephone Detection on Domestic Formats</h2>
         </div>
         <span class="badge yellow">Govern</span>
@@ -534,7 +613,7 @@ custom_info_types = [
     <article class="step-card" id="issue-dlp-overscrub">
       <div class="step-header">
         <div>
-          <span class="step-num">Learning 15 · Govern</span>
+          <span class="step-num">Learning 16 · Govern</span>
           <h2 class="step-title">Syntactic Redaction vs. Semantic Context (Over-Scrubbing)</h2>
         </div>
         <span class="badge yellow">Govern</span>
@@ -558,7 +637,7 @@ custom_info_types = [
     <article class="step-card" id="issue-asgi-loop">
       <div class="step-header">
         <div>
-          <span class="step-num">Learning 16 · Govern</span>
+          <span class="step-num">Learning 17 · Govern</span>
           <h2 class="step-title">Pure-ASGI Middleware Streaming Disconnect Loop</h2>
         </div>
         <span class="badge yellow">Govern</span>
@@ -590,7 +669,7 @@ async def wrapped_receive():
     <article class="step-card" id="issue-registry-wiki">
       <div class="step-header">
         <div>
-          <span class="step-num">Learning 17 · Govern</span>
+          <span class="step-num">Learning 18 · Govern</span>
           <h2 class="step-title">Agent Registry vs. The 50-Agent Static Wiki Problem</h2>
         </div>
         <span class="badge yellow">Fleet Governance</span>
@@ -616,7 +695,7 @@ async def wrapped_receive():
     <article class="step-card" id="issue-policy-enforce">
       <div class="step-header">
         <div>
-          <span class="step-num">Learning 18 · Govern</span>
+          <span class="step-num">Learning 19 · Govern</span>
           <h2 class="step-title">Semantic Governance: Policy Existence vs. Live Runtime Enforcement</h2>
         </div>
         <span class="badge yellow">Govern</span>
@@ -643,7 +722,7 @@ async def wrapped_receive():
     <article class="step-card" id="issue-inspect-trap">
       <div class="step-header">
         <div>
-          <span class="step-num">Learning 19 · Govern</span>
+          <span class="step-num">Learning 20 · Govern</span>
           <h2 class="step-title">The "Inspect-Only" Trap &amp; Fail-Closed Posture (<code>failOpen: false</code>)</h2>
         </div>
         <span class="badge red">Security Posture</span>
@@ -667,7 +746,7 @@ async def wrapped_receive():
     <article class="step-card" id="issue-8mb-quota">
       <div class="step-header">
         <div>
-          <span class="step-num">Learning 20 · Govern</span>
+          <span class="step-num">Learning 21 · Govern</span>
           <h2 class="step-title">Vertex AI 8MB Request Payload Quota Trap &amp; <code>.gcloudignore</code></h2>
         </div>
         <span class="badge yellow">Deployment Quota</span>
