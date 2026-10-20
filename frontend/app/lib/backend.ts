@@ -21,7 +21,7 @@ import { GoogleAuth } from "google-auth-library";
  *             projects/<num>/locations/<loc>/reasoningEngines/<id>/api
  */
 export const BACKEND_ORIGIN = (
-  process.env.ADK_BACKEND_ORIGIN ?? "http://localhost:8000"
+  process.env.ADK_BACKEND_ORIGIN?.trim() || "http://localhost:8000"
 ).replace(/\/+$/, "");
 
 /**
@@ -54,11 +54,9 @@ export async function googleAuthHeader(): Promise<Record<string, string>> {
   return { Authorization: `Bearer ${token.token}` };
 }
 
-const LOCAL_BACKEND = "http://127.0.0.1:8000";
-
-/** fetch() against the backend, adding auth only when the target needs it.
- * Implements graceful fallback to the local backend if a configured remote
- * Reasoning Engine returns 404 (e.g. torn down after a previous lab session).
+/**
+ * Deterministic fetch against the configured ADK backend.
+ * Enforces Twelve-Factor explicit binding (Fail-Closed) — no silent fallbacks.
  */
 export async function backendFetch(
   path: string,
@@ -71,59 +69,5 @@ export async function backendFetch(
     ...(isRemote ? await googleAuthHeader() : {}),
   };
 
-  try {
-    const res = await fetch(url, { ...init, headers });
-    // If the remote reasoning engine was deleted/not found (HTTP 404), check if a local backend is alive
-    if (res.status === 404 && isRemote) {
-      try {
-        const localCheck = await fetch(`${LOCAL_BACKEND}/healthz`, {
-          signal: AbortSignal.timeout(1500),
-        });
-        if (localCheck.ok) {
-          console.warn(
-            `[backendFetch] Configured ADK_BACKEND_ORIGIN (${BACKEND_ORIGIN}) returned 404 NOT_FOUND. ` +
-              `Falling back gracefully to local backend at ${LOCAL_BACKEND}${path}.`,
-          );
-          const localHeaders = {
-            ...(init.headers as Record<string, string> | undefined),
-          };
-          delete localHeaders["authorization"];
-          delete localHeaders["Authorization"];
-          return await fetch(`${LOCAL_BACKEND}${path}`, {
-            ...init,
-            headers: localHeaders,
-          });
-        }
-      } catch {
-        // Local backend not reachable; fall through to return original 404
-      }
-    }
-    return res;
-  } catch (err) {
-    if (isRemote) {
-      try {
-        const localCheck = await fetch(`${LOCAL_BACKEND}/healthz`, {
-          signal: AbortSignal.timeout(1500),
-        });
-        if (localCheck.ok) {
-          console.warn(
-            `[backendFetch] Connection to ADK_BACKEND_ORIGIN (${BACKEND_ORIGIN}) failed (${err}). ` +
-              `Falling back gracefully to local backend at ${LOCAL_BACKEND}${path}.`,
-          );
-          const localHeaders = {
-            ...(init.headers as Record<string, string> | undefined),
-          };
-          delete localHeaders["authorization"];
-          delete localHeaders["Authorization"];
-          return await fetch(`${LOCAL_BACKEND}${path}`, {
-            ...init,
-            headers: localHeaders,
-          });
-        }
-      } catch {
-        // fall through
-      }
-    }
-    throw err;
-  }
+  return await fetch(url, { ...init, headers });
 }

@@ -13,6 +13,7 @@ import { ConfirmAction } from "./components/ConfirmAction";
 import { GoogleDots, Logo } from "./components/Logo";
 import { PostGallery } from "./components/PostGallery";
 import { StagePanel } from "./components/StagePanel";
+import { BackendStatusBadge } from "./components/BackendStatusBadge";
 
 const SUGGESTIONS = [
   {
@@ -48,6 +49,7 @@ function Header() {
         <GoogleDots />
         Built on Google Cloud · ADK + AG-UI + CopilotKit
       </span>
+      <BackendStatusBadge />
       <div className="header-spacer" />
       <button
         className="signout-button new-chat-button"

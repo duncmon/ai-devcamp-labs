@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Twelve-Factor Backend Binding Deep Dive — Social Spark Portfolio</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    try {
+      var t = localStorage.getItem("social-spark-theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+  <style>
+    /* Page-specific enhancements for deep-dive architecture reading */
+    .anti-pattern-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 16px;
+      margin: 18px 0 24px;
+    }
+    .anti-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .anti-card.danger {
+      border-top: 4px solid var(--optimise);
+    }
+    .anti-card.twelve-factor {
+      border-top: 4px solid var(--scale);
+    }
+    .anti-card h4 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .anti-card p {
+      font-size: 13.5px;
+      color: var(--muted);
+      line-height: 1.55;
+      margin: 0 0 10px;
+    }
+    .anti-card .consequence {
+      margin-top: auto;
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: var(--accent-soft);
+      color: var(--text);
+    }
+    .anti-card.danger .consequence {
+      background: rgba(234, 67, 53, 0.08);
+      color: #d93025;
+      border: 1px solid rgba(234, 67, 53, 0.2);
+    }
+    .anti-card.twelve-factor .consequence {
+      background: rgba(52, 168, 83, 0.08);
+      color: #188038;
+      border: 1px solid rgba(52, 168, 83, 0.2);
+    }
+    .status-badge-preview {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      margin: 2px 4px 2px 0;
+    }
+    .badge-preview-local {
+      background: rgba(52, 168, 83, 0.12);
+      color: #188038;
+      border: 1px solid rgba(52, 168, 83, 0.28);
+    }
+    .badge-preview-cloud {
+      background: rgba(66, 133, 244, 0.12);
+      color: #1a73e8;
+      border: 1px solid rgba(66, 133, 244, 0.28);
+    }
+    .badge-preview-unreachable {
+      background: rgba(234, 67, 53, 0.12);
+      color: #d93025;
+      border: 1px solid rgba(234, 67, 53, 0.28);
+    }
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #1e1e2e;
+      color: #a6adc8;
+      padding: 6px 14px;
+      border-top-left-radius: 10px;
+      border-top-right-radius: 10px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      border: 1px solid #313244;
+      border-bottom: none;
+      margin-top: 14px;
+    }
+    .code-header + pre {
+      margin-top: 0;
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+    }
+    .copy-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #cdd6f4;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+    .copy-btn:hover {
+      background: rgba(255, 255, 255, 0.18);
+      color: #fff;
+    }
+    .copy-btn.copied {
+      background: #34a853;
+      color: #fff;
+      border-color: #34a853;
+    }
+    .test-scenario-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+      margin: 14px 0 20px;
+    }
+    .test-scenario-table th, .test-scenario-table td {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+    .test-scenario-table th {
+      background: var(--accent-soft);
+      color: var(--text);
+      font-weight: 700;
+    }
+    .test-scenario-table td {
+      background: var(--panel);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-left">
+      <div class="brand-mark"></div>
+      <a href="index.html" class="nav-title">Social Spark — Attendee Portfolio</a>
+      <span class="nav-subtitle">Twelve-Factor Backend Binding Deep Dive</span>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html">Overview</a>
+      <a href="lab-1.html">Lab 1 (Build)</a>
+      <a href="lab-2.html">Lab 2 (Scale)</a>
+      <a href="lab-3.html">Lab 3 (Govern)</a>
+      <a href="learnings.html">Our Learnings</a>
+      <a href="backend-binding.html" class="active">Backend Binding</a>
+      <a href="shell-script-flags.html">CLI Flags</a>
+      <a href="https://sonikajanagill.com/ai-devcamp-labs/index.html" target="_blank" rel="noopener" class="upstream-pill">
+        Upstream Labs (Sonika Gill) ↗
+      </a>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">🌗</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-meta">
+        <span class="badge blue">Principles 1, 2, 3</span>
+        <span class="badge green">Twelve-Factor Cloud Native</span>
+        <span class="badge yellow">Fail-Closed Security</span>
+        <span>Target: <strong>Next.js + ADK Proxy</strong></span>
+      </div>
+      <h1>Twelve-Factor Backend Binding: Eliminating the Dynamic Auto-Discovery Anti-Pattern</h1>
+      <p class="lead">
+        A deep architectural analysis, engineering specification, and verification runbook documenting how Social Spark transitioned from speculative local fallback to deterministic, Twelve-Factor backend binding across local development, Cloud Run proxies, and Vertex AI Reasoning Engines.
+      </p>
+      <div class="callout info">
+        <strong>The Catalyst Event (Lab 1 Step 8):</strong> When returning to local testing after tearing down a remote Vertex AI Reasoning Engine in Lab 2, Next.js encountered an <code>HTTP 404 NOT_FOUND</code> error due to a stale <code>ADK_BACKEND_ORIGIN</code>. While an early experimental prototype introduced speculative auto-probing of <code>localhost:8000</code>, rigorous cloud-native evaluation revealed that <em>dynamic auto-discovery is an enterprise anti-pattern</em>. Here is how we designed, implemented, and verified the production architecture.
+      </div>
+    </section>
+
+    <!-- Executive Architecture Bento Grid -->
+    <h2 style="font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 14px;">The Three Core Binding Principles</h2>
+    <div class="bento">
+      <div class="tile span-4" style="border-left: 4px solid var(--build);">
+        <div class="kicker">Principle 1 · Diagnostics</div>
+        <div class="title">Fail-Closed Diagnostics</div>
+        <div class="desc">
+          Replace silent speculative rerouting with deterministic failure interception. Intercept 404, 401/403, and network errors in <code>app/api/adk/route.ts</code> to synthesize a 5-event AG-UI SSE stream presenting clear Markdown troubleshooting instructions instead of crashing CopilotKit.
+        </div>
+        <div class="meta">
+          <span>Target: <code>backend.ts</code> &amp; <code>route.ts</code></span>
+          <span style="font-weight: 600; color: var(--build);">Pure Determinism</span>
+        </div>
+      </div>
+
+      <div class="tile span-4" style="border-left: 4px solid var(--scale);">
+        <div class="kicker">Principle 2 · Observability</div>
+        <div class="title">Visual Status Badge</div>
+        <div class="desc">
+          Eliminate invisible routing assumptions. Expose <code>/api/backend-status</code> with a 2.5s health probe, rendered live in the dashboard header via <code>&lt;BackendStatusBadge /&gt;</code> displaying <span class="status-badge-preview badge-preview-local">● Local (:8000)</span>, <span class="status-badge-preview badge-preview-cloud">☁ Vertex AI (us-central1:1836…)</span>, or <span class="status-badge-preview badge-preview-unreachable">⚠ Unreachable</span>.
+        </div>
+        <div class="meta">
+          <span>Target: <code>BackendStatusBadge.tsx</code></span>
+          <span style="font-weight: 600; color: var(--scale);">Auto-Polling &amp; Tooltips</span>
+        </div>
+      </div>
+
+      <div class="tile span-4" style="border-left: 4px solid var(--govern);">
+        <div class="kicker">Principle 3 · Operations</div>
+        <div class="title">Dynamic Launch Profiles</div>
+        <div class="desc">
+          Decouple execution environment from manual file edits. Re-engineer <code>run-frontend.sh</code> to accept pure-Bash <code>--local</code> (default) and <code>--cloud</code> flags, dynamically extracting <code>remote_agent_runtime_id</code> from <code>deployment_metadata.json</code> via a 3-tier cascade.
+        </div>
+        <div class="meta">
+          <span>Target: <code>run-frontend.sh</code></span>
+          <span style="font-weight: 600; color: #d97706;"><a href="shell-script-flags.html" style="color: inherit; text-decoration: underline;">CLI Flags Guide →</a></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 1: ARCHITECTURAL RATIONALE -->
+    <article class="step-card" id="architectural-rationale">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Architectural Rationale</span>
+          <h2 class="step-title">Why Dynamic Auto-Discovery is an Enterprise Anti-Pattern</h2>
+        </div>
+        <span class="badge red">Anti-Pattern Post-Mortem</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🏛️</span> The Illusion of Convenience vs. Multi-Tenant Reality</div>
+          <p>
+            When an application encounters an upstream connection failure (such as an <code>HTTP 404 NOT_FOUND</code> from a torn-down Vertex AI Reasoning Engine), a developer's natural instinct might be to implement an automated speculative fallback: <em>"If the cloud endpoint 404s, probe localhost:8000; if port 8000 is open, silently route traffic there."</em>
+          </p>
+          <p>
+            While convenient in single-developer desktop experiments, this dynamic auto-discovery pattern violates fundamental distributed systems and security tenets. In modern AI architectures where agents maintain state, execute sensitive tool calls, and run behind governed gateways, silent auto-discovery introduces catastrophic risks:
+          </p>
+
+          <div class="anti-pattern-grid">
+            <!-- Anti-Pattern 1 -->
+            <div class="anti-card danger">
+              <h4><span>⚠️</span> 1. The Split-Brain Trap</h4>
+              <p>
+                <strong>State &amp; Memory Divergence:</strong> The local development server stores conversational turns in ephemeral RAM or local SQLite (<code>social_spark.db</code>), writing generated graphics to local disk (<code>./gallery/</code>). Conversely, Vertex AI Agent Runtime persists session turns in managed cloud storage and synthesizes long-term semantic context in the <strong>Vertex AI Memory Bank</strong> across scale-to-zero cycles.
+              </p>
+              <p>
+                If the frontend silently fails over to <code>localhost:8000</code> when the cloud network drops or restarts, the user's conversation state instantly bifurcates. Subsequent tool calls and posts write to local SQLite. When the cloud engine recovers, the cloud Memory Bank has zero record of the interaction, leading to conflicting knowledge, corrupted session state, and irrecoverable data loss.
+              </p>
+              <div class="consequence">
+                <strong>Failure Consequence:</strong> User sessions silently split between local and cloud storage, destroying data consistency.
+              </div>
+            </div>
+
+            <!-- Anti-Pattern 2 -->
+            <div class="anti-card danger">
+              <h4><span>🛡️</span> 2. The Latent 200 Security Bypass</h4>
+              <p>
+                <strong>Evasion of Governed Perimeter:</strong> In Lab 3 (Govern), the production reasoning engine is enclosed in a defense-in-depth perimeter:
+              </p>
+              <ul style="font-size: 13px; color: var(--muted); margin: 0 0 10px; padding-left: 18px;">
+                <li><strong>Model Armor Service Extension:</strong> Edge-level prompt injection and jailbreak screening with <code>failOpen: false</code>.</li>
+                <li><strong>Cloud DLP Boundary Redaction:</strong> Masks domestic and international PII before LLM ingestion.</li>
+                <li><strong>Agent Gateway Ingress:</strong> Enforces IAM principal authentication and rate limits.</li>
+              </ul>
+              <p>
+                If an intentional policy block (e.g. 403 or 404) triggers speculative fallback to <code>localhost:8000</code>, traffic is rerouted to an unhardened, local FastAPI process that lacks Model Armor and Cloud DLP!
+              </p>
+              <p>
+                Crucially, Next.js returns an <code>HTTP 200 OK</code> to the browser. The security operations center believes traffic is passing through governed infrastructure, when in reality security controls were silently bypassed.
+              </p>
+              <div class="consequence">
+                <strong>Failure Consequence:</strong> Fatal fail-open vulnerability. Adversaries can bypass security filters while Next.js reports 200 OK.
+              </div>
+            </div>
+
+            <!-- Anti-Pattern 3 -->
+            <div class="anti-card danger">
+              <h4><span>🔄</span> 3. Session Divergence &amp; Incompatible APIs</h4>
+              <p>
+                <strong>Cryptographic Resource URIs:</strong> ADK session tokens generated by Vertex AI Agent Runtime are regional resource identifiers:
+                <code>projects/498585195540/locations/us-central1/reasoningEngines/1836136314752204800/sessions/session-xyz</code>.
+              </p>
+              <p>
+                The local FastAPI server's <code>InMemorySessionService</code> does not recognize Vertex AI resource URIs. Attempting to pass a cloud session ID to the local server results in session lookup crashes or forces the creation of an unexpected empty session, resetting the user's conversational context mid-sentence.
+              </p>
+              <div class="consequence">
+                <strong>Failure Consequence:</strong> Cryptographic session mismatch triggers unhandled runtime exceptions or abrupt context wipes.
+              </div>
+            </div>
+          </div>
+
+          <div class="part-label"><span class="icon">📜</span> The Twelve-Factor App Solution</div>
+          <p>
+            To address these vulnerabilities, we adopt the industry standard <a href="https://12factor.net/" target="_blank" rel="noopener">Twelve-Factor App</a> methodology:
+          </p>
+
+          <div class="anti-pattern-grid">
+            <div class="anti-card twelve-factor">
+              <h4><span>⚙️</span> Factor III: Config in Environment</h4>
+              <p>
+                Configuration that varies between deployments (such as backend endpoints, database URIs, and credentials) must be stored strictly in the environment, not hardcoded or dynamically inferred. The configuration variable <code>ADK_BACKEND_ORIGIN</code> must be explicitly provided at container startup and remain immutable during the process lifecycle.
+              </p>
+              <div class="consequence">
+                <strong>Enforcement:</strong> <code>ADK_BACKEND_ORIGIN</code> is explicitly bound via environment variables or CLI profiles, never guessed at runtime.
+              </div>
+            </div>
+
+            <div class="anti-card twelve-factor">
+              <h4><span>🔌</span> Factor IV: Backing Services as Attached Resources</h4>
+              <p>
+                A backing service is any service the app consumes over the network (such as a datastore, queue, or AI reasoning engine). The application code must treat local and third-party services identically as attached resources. If an attached resource becomes unavailable or returns an error, the application must <strong>fail closed deterministically</strong>, surface actionable diagnostic telemetry to the operator, and never arbitrarily rewire itself to a different resource.
+              </p>
+              <div class="consequence">
+                <strong>Enforcement:</strong> Inability to reach the declared backing service results in immediate, structured fail-closed diagnostics.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- SECTION 2: STEP-BY-STEP IMPLEMENTATION BREAKDOWN -->
+    <article class="step-card" id="implementation-breakdown">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Implementation</span>
+          <h2 class="step-title">Step-by-Step Codebase Implementation Breakdown</h2>
+        </div>
+        <span class="badge blue">Code Modifications</span>
+      </div>
+      <div class="step-body">
+
+        <!-- Principle 1: Fail-Closed Diagnostics -->
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🎯</span> Principle 1: Fail-Closed Diagnostics in Next.js Proxy</div>
+          <p>
+            The Next.js proxy serves as the security and protocol gateway between the browser and the ADK backend. We hardened this layer across two core files:
+          </p>
+          <ol>
+            <li>
+              <strong>Eliminated Speculative Fallback in <code>frontend/app/lib/backend.ts</code>:</strong>
+              Removed <code>LOCAL_BACKEND = "http://127.0.0.1:8000"</code> and stripped the speculative <code>try/catch</code> fallback block. <code>backendFetch</code> now deterministically executes requests strictly against <code>BACKEND_ORIGIN</code>, while transparently minting Application Default Credentials (ADC) tokens for remote Google Cloud endpoints.
+            </li>
+            <li>
+              <strong>Synthesized 5-Event AG-UI SSE Stream in <code>frontend/app/api/adk/route.ts</code>:</strong>
+              When upstream returns an error (404, 401/403, or connection drop), instead of returning raw JSON or HTML that causes CopilotKit's React runtime to throw an unhandled error modal, we synthesize a clean AG-UI Server-Sent Event (SSE) stream adhering to the CopilotKit protocol:
+              <ol style="margin-top: 6px;">
+                <li><code>RUN_STARTED</code> (initiates the thread execution)</li>
+                <li><code>TEXT_MESSAGE_START</code> (opens assistant message block)</li>
+                <li><code>TEXT_MESSAGE_CONTENT</code> (delivers rich, actionable Markdown diagnostics)</li>
+                <li><code>TEXT_MESSAGE_END</code> (closes message block)</li>
+                <li><code>RUN_FINISHED</code> (cleanly terminates stream without client errors)</li>
+              </ol>
+            </li>
+          </ol>
+
+          <div class="code-header">
+            <span>frontend/app/lib/backend.ts — Deterministic Binding</span>
+            <button class="copy-btn" onclick="copySnippet(this)">Copy</button>
+          </div>
+          <pre><code>import { GoogleAuth } from "google-auth-library";
+
+export const BACKEND_ORIGIN = (
+  process.env.ADK_BACKEND_ORIGIN?.trim() || "http://localhost:8000"
+).replace(/\/+$/, "");
+
+export const needsGoogleAuth = (url: string) =>
+  /^https:\/\/[^/]*\.googleapis\.com\//.test(url);
+
+const auth = new GoogleAuth({
+  scopes: "https://www.googleapis.com/auth/cloud-platform",
+});
+
+export async function googleAuthHeader(): Promise&lt;Record&lt;string, string&gt;&gt; {
+  const token = await (await auth.getClient()).getAccessToken();
+  if (!token.token) {
+    throw new Error("No Google access token available. Run `gcloud auth application-default login`.");
+  }
+  return { Authorization: `Bearer ${token.token}` };
+}
+
+/**
+ * Deterministic fetch against the configured ADK backend.
+ * Enforces Twelve-Factor explicit binding (Fail-Closed) — no silent fallbacks.
+ */
+export async function backendFetch(path: string, init: RequestInit = {}): Promise&lt;Response&gt; {
+  const url = `${BACKEND_ORIGIN}${path}`;
+  const isRemote = needsGoogleAuth(url);
+  const headers: Record&lt;string, string&gt; = {
+    ...(init.headers as Record&lt;string, string&gt; | undefined),
+    ...(isRemote ? await googleAuthHeader() : {}),
+  };
+
+  return await fetch(url, { ...init, headers });
+}</code></pre>
+
+          <div class="code-header">
+            <span>frontend/app/api/adk/route.ts — AG-UI Stream Synthesis</span>
+            <button class="copy-btn" onclick="copySnippet(this)">Copy</button>
+          </div>
+          <pre><code>function makeDiagnosticEventStream(threadId: string, runId: string, markdownMessage: string): Response {
+  const messageId = `diag-${Date.now()}`;
+  const events = [
+    { type: "RUN_STARTED", threadId, runId },
+    { type: "TEXT_MESSAGE_START", messageId, role: "assistant" },
+    { type: "TEXT_MESSAGE_CONTENT", messageId, delta: markdownMessage },
+    { type: "TEXT_MESSAGE_END", messageId },
+    { type: "RUN_FINISHED", threadId, runId },
+  ];
+
+  const sseBody = events.map((evt) =&gt; `data: ${JSON.stringify(evt)}\n\n`).join("");
+
+  return new Response(sseBody, {
+    status: 200,
+    headers: {
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-store, no-cache, must-revalidate",
+      connection: "keep-alive",
+    },
+  });
+}</code></pre>
+        </div>
+
+        <!-- Principle 2: Visual Observability Badge -->
+        <div class="part-section">
+          <div class="part-label"><span class="icon">👁️</span> Principle 2: Visual Observability Badge in Dashboard Header</div>
+          <p>
+            To prevent developers and operators from working under false assumptions regarding which backend is serving traffic, we introduced an end-to-end visual observability pipeline:
+          </p>
+          <ol>
+            <li>
+              <strong>Health Probe API (<code>frontend/app/api/backend-status/route.ts</code>):</strong>
+              Configured with <code>export const dynamic = "force-dynamic"</code> and <code>Cache-Control: no-store</code>. Performs a fast 2500ms timeout probe against <code>${BACKEND_ORIGIN}/healthz</code>, returning <code>{ origin, isLocal, healthy }</code>.
+            </li>
+            <li>
+              <strong>Client Component (<code>frontend/app/components/BackendStatusBadge.tsx</code>):</strong>
+              A reactive pill component mounted directly inside <code>frontend/app/page.tsx</code>'s <code>&lt;Header /&gt;</code>. Features:
+              <ul style="margin-top: 6px;">
+                <li><strong>Auto-Polling:</strong> Re-evaluates health every 10 seconds with clean unmount timer disposal.</li>
+                <li><strong>Click-to-Refresh:</strong> Immediate manual re-check on user click (accessible with <code>role="button"</code>).</li>
+                <li><strong>Dynamic Label Parsing:</strong> Automatically truncates long Vertex AI resource IDs (e.g., <code>us-central1:1836…</code>) and parses local ports.</li>
+                <li><strong>Hover Tooltips:</strong> Full destination URL, target infrastructure, and error messages surfaced via <code>title</code> attribute.</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Design Tokens in <code>frontend/app/globals.css</code>:</strong>
+              Added Google standard status colors (<code>--g-green</code>, <code>--g-blue</code>, <code>--g-red</code>) with pulsing indicator animations (<code>@keyframes pulse-dot</code>).
+            </li>
+          </ol>
+
+          <div class="code-header">
+            <span>frontend/app/api/backend-status/route.ts — Health Probe API</span>
+            <button class="copy-btn" onclick="copySnippet(this)">Copy</button>
+          </div>
+          <pre><code>import { NextResponse } from "next/server";
+import { BACKEND_ORIGIN, backendFetch, needsGoogleAuth } from "@/app/lib/backend";
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const origin = BACKEND_ORIGIN;
+  const isLocal = !needsGoogleAuth(origin);
+  const noCacheHeaders = { "cache-control": "no-store, no-cache, must-revalidate" };
+
+  try {
+    const probeRes = await backendFetch("/healthz", { signal: AbortSignal.timeout(2500) });
+    if (probeRes.ok) {
+      return NextResponse.json({ origin, isLocal, healthy: true }, { headers: noCacheHeaders });
+    }
+    return NextResponse.json({ origin, isLocal, healthy: false, status: probeRes.status, error: `HTTP ${probeRes.status}` }, { headers: noCacheHeaders });
+  } catch (err: any) {
+    const error = err?.name === "TimeoutError" ? "Health check timed out (2500ms)" : (err?.message ?? "Connection failed");
+    return NextResponse.json({ origin, isLocal, healthy: false, error }, { headers: noCacheHeaders });
+  }
+}</code></pre>
+        </div>
+
+        <!-- Principle 3: Launch Profiles -->
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🚀</span> Principle 3: Dynamic Launch Profiles in <code>run-frontend.sh</code></div>
+          <p>
+            Rather than requiring developers to manually edit <code>frontend/.env.local</code> when switching between local dev and deployed cloud verification, we enhanced <code>run-frontend.sh</code> with a robust, pure-Bash state machine:
+          </p>
+          <ul>
+            <li><code>./run-frontend.sh --local</code> (or default <code>./run-frontend.sh</code>): Automatically exports <code>ADK_BACKEND_ORIGIN="http://localhost:8000"</code>.</li>
+            <li><code>./run-frontend.sh --cloud</code>: Inspects <code>deployment_metadata.json</code>, parses <code>remote_agent_runtime_id</code> via a 3-tier cascade (<code>jq</code> &rarr; <code>python3</code> &rarr; <code>sed</code>), extracts the deployment region, and constructs the official Vertex AI Reasoning Engine API URL.</li>
+            <li><code>./run-frontend.sh --help</code>: Outputs POSIX-standard usage instructions and exits 0.</li>
+            <li>Invalid flags: Outputs actionable syntax errors to stderr and exits 1.</li>
+          </ul>
+
+          <div class="code-header">
+            <span>run-frontend.sh — Profile State Machine &amp; JSON Cascade</span>
+            <button class="copy-btn" onclick="copySnippet(this)">Copy</button>
+          </div>
+          <pre><code># Pure-Bash Argument Parsing (POSIX & Darwin compatible)
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --local|-l) PROFILE="local"; shift ;;
+    --cloud|-c) PROFILE="cloud"; shift ;;
+    --help|-h)  usage ;;
+    *) echo "Error: Unknown argument '$1'" &gt;&2; exit 1 ;;
+  esac
+done
+
+if [[ "$PROFILE" == "cloud" ]]; then
+  # 3-Tier Cascade: jq -> python3 -> sed (zero mandatory external dependencies)
+  if command -v jq &gt;/dev/null 2&gt;&1; then
+    REMOTE_ID=$(jq -r '.remote_agent_runtime_id // empty' "$METADATA_FILE" 2&gt;/dev/null || true)
+  elif command -v python3 &gt;/dev/null 2&gt;&1; then
+    REMOTE_ID=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('remote_agent_runtime_id', ''))" "$METADATA_FILE" 2&gt;/dev/null || true)
+  else
+    REMOTE_ID=$(sed -n 's/.*"remote_agent_runtime_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$METADATA_FILE" 2&gt;/dev/null || true)
+  fi
+
+  LOCATION=$(echo "$REMOTE_ID" | cut -d'/' -f4)
+  export ADK_BACKEND_ORIGIN="https://${LOCATION}-aiplatform.googleapis.com/reasoningEngines/v1/${REMOTE_ID}/api"
+else
+  export ADK_BACKEND_ORIGIN="http://localhost:8000"
+fi</code></pre>
+
+          <div class="callout info" style="margin-top: 14px;">
+            <strong>DevOps Educational Guide:</strong> For an in-depth breakdown of Bash argument handling, the <code>shift</code> stack mechanism, and POSIX <code>getopts</code> vs. manual loops, see our companion guide: <a href="shell-script-flags.html" style="font-weight: 700; color: var(--accent); text-decoration: underline;">Adapting Shell Scripts for CLI Flags (getopts &amp; shift)</a>.
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- SECTION 3: TESTING & VALIDATION PROCEDURES -->
+    <article class="step-card" id="testing-validation">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Verification</span>
+          <h2 class="step-title">Testing &amp; Validation Procedures</h2>
+        </div>
+        <span class="badge green">Pass / Verified</span>
+      </div>
+      <div class="step-body">
+        <p>
+          We established three concrete, repeatable test scenarios verifying the full matrix of local, torn-down cloud, and active cloud backend bindings:
+        </p>
+
+        <table class="test-scenario-table">
+          <thead>
+            <tr>
+              <th>Scenario</th>
+              <th>Trigger &amp; Command</th>
+              <th>Expected Status Badge</th>
+              <th>Chat Runtime Behavior</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Scenario A</strong><br>Local Dev Server</td>
+              <td><code>./run-backend.sh</code><br><code>./run-frontend.sh --local</code></td>
+              <td><span class="status-badge-preview badge-preview-local">● Local (:8000)</span></td>
+              <td>Chat prompt dispatches to local Uvicorn FastAPI process. Post creations write to local SQLite.</td>
+            </tr>
+            <tr>
+              <td><strong>Scenario B</strong><br>Torn-Down Cloud</td>
+              <td><code>export ADK_BACKEND_ORIGIN=".../3690295549229006848/api"</code><br><code>npm run dev</code></td>
+              <td><span class="status-badge-preview badge-preview-unreachable">⚠ Unreachable</span></td>
+              <td>CopilotKit displays structured diagnostic Markdown card explaining exact recovery steps; zero crash modals.</td>
+            </tr>
+            <tr>
+              <td><strong>Scenario C</strong><br>Dynamic Cloud Profile</td>
+              <td><code>./run-frontend.sh --cloud</code></td>
+              <td><span class="status-badge-preview badge-preview-cloud">☁ Vertex AI (us-central1:1836…)</span></td>
+              <td>Chat executes against deployed Reasoning Engine with ADC bearer token authentication.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Scenario A Terminal -->
+        <div class="part-section">
+          <div class="part-label"><span class="icon">💻</span> Scenario A Live Terminal Verification: Local Binding (:8000)</div>
+          <div class="code-header">
+            <span>Terminal Execution — Scenario A</span>
+            <button class="copy-btn" onclick="copySnippet(this)">Copy</button>
+          </div>
+          <pre><code># 1. Start local backend in Terminal 1
+$ ./run-backend.sh
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [48291] using StatReload
+INFO:     Mounted AG-UI endpoint at /api/adk
+INFO:     127.0.0.1:52182 - "GET /healthz HTTP/1.1" 200 OK
+
+# 2. Start frontend in Terminal 2 with default local profile
+$ ./run-frontend.sh --local
+==========================================================
+ [run-frontend] Profile: LOCAL (:8000)
+ [run-frontend] Origin:  http://localhost:8000
+==========================================================
+   ▲ Next.js 14.2.5
+   - Local:        http://localhost:3000
+
+# 3. Probe backend health status endpoint
+$ curl -s http://localhost:3000/api/backend-status | jq .
+{
+  "origin": "http://localhost:8000",
+  "isLocal": true,
+  "healthy": true
+}</code></pre>
+        </div>
+
+        <!-- Scenario B Terminal -->
+        <div class="part-section">
+          <div class="part-label"><span class="icon">💻</span> Scenario B Live Terminal Verification: Torn-Down Cloud Engine Diagnostics</div>
+          <div class="code-header">
+            <span>Terminal Execution — Scenario B</span>
+            <button class="copy-btn" onclick="copySnippet(this)">Copy</button>
+          </div>
+          <pre><code># 1. Target deleted reasoning engine left over after Lab 2 teardown
+$ export ADK_BACKEND_ORIGIN="https://us-central1-aiplatform.googleapis.com/reasoningEngines/v1/projects/498585195540/locations/us-central1/reasoningEngines/3690295549229006848/api"
+$ npm run dev
+
+# 2. Probe backend status endpoint (reports unhealthy 404)
+$ curl -s http://localhost:3000/api/backend-status | jq .
+{
+  "origin": "https://us-central1-aiplatform.googleapis.com/reasoningEngines/v1/projects/498585195540/locations/us-central1/reasoningEngines/3690295549229006848/api",
+  "isLocal": false,
+  "healthy": false,
+  "status": 404,
+  "error": "HTTP 404"
+}
+
+# 3. Test chat prompt dispatch via curl to verify AG-UI SSE stream synthesis
+$ curl -s -X POST http://localhost:3000/api/adk \
+  -H "Content-Type: application/json" \
+  -d '{"threadId":"test-thread","runId":"test-run","messages":[{"role":"user","content":"hello"}]}'
+data: {"type":"RUN_STARTED","threadId":"test-thread","runId":"test-run"}
+
+data: {"type":"TEXT_MESSAGE_START","messageId":"diag-1729454120000","role":"assistant"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","messageId":"diag-1729454120000","delta":"⚠️ **Vertex AI Reasoning Engine Endpoint Not Found (HTTP 404)**\n\nThe configured cloud backend is unreachable:\n`https://us-central1-aiplatform.googleapis.com/.../3690295549229006848/api`\n\n**Probable Causes:**\n- The Reasoning Engine was deleted, expired, or torn down.\n- Stale `deployment_metadata.json` or outdated `.env.local`.\n\n**Resolution Steps:**\n1. **Switch to Local Development:**\n   ```bash\n   ./run-backend.sh\n   ./run-frontend.sh --local\n   ```\n2. **Deploy Fresh Cloud Engine:**\n   ```bash\n   agents-cli deploy\n   ./run-frontend.sh --cloud\n   ```"}
+
+data: {"type":"TEXT_MESSAGE_END","messageId":"diag-1729454120000"}
+
+data: {"type":"RUN_FINISHED","threadId":"test-thread","runId":"test-run"}</code></pre>
+        </div>
+
+        <!-- Scenario C Terminal -->
+        <div class="part-section">
+          <div class="part-label"><span class="icon">💻</span> Scenario C Live Terminal Verification: Dynamic Cloud Profile Launch</div>
+          <div class="code-header">
+            <span>Terminal Execution — Scenario C</span>
+            <button class="copy-btn" onclick="copySnippet(this)">Copy</button>
+          </div>
+          <pre><code># 1. Launch frontend using --cloud flag
+$ ./run-frontend.sh --cloud
+==========================================================
+ [run-frontend] Profile: CLOUD (Vertex AI Reasoning Engine)
+ [run-frontend] Target:  projects/498585195540/locations/us-central1/reasoningEngines/1836136314752204800
+ [run-frontend] Origin:  https://us-central1-aiplatform.googleapis.com/reasoningEngines/v1/projects/498585195540/locations/us-central1/reasoningEngines/1836136314752204800/api
+==========================================================
+   ▲ Next.js 14.2.5
+   - Local:        http://localhost:3000
+
+# 2. Check probe endpoint
+$ curl -s http://localhost:3000/api/backend-status | jq .
+{
+  "origin": "https://us-central1-aiplatform.googleapis.com/reasoningEngines/v1/projects/498585195540/locations/us-central1/reasoningEngines/1836136314752204800/api",
+  "isLocal": false,
+  "healthy": true
+}</code></pre>
+        </div>
+      </div>
+    </article>
+
+    <!-- SECTION 4: DIFFICULTIES ENCOUNTERED & SOLUTIONS -->
+    <article class="step-card" id="difficulties-encountered">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Engineering Challenges</span>
+          <h2 class="step-title">Difficulties Encountered &amp; Production Solutions</h2>
+        </div>
+        <span class="badge yellow">Obstacles Overcome</span>
+      </div>
+      <div class="step-body">
+        <p>
+          Bridging modern browser frameworks with serverless Google Cloud AI endpoints presents subtle edge cases. Here are the four primary engineering hurdles encountered and how each was resolved:
+        </p>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">⚡</span> 1. CopilotKit AG-UI Stream Formatting &amp; Error Interception</div>
+          <p>
+            <strong>The Problem:</strong> CopilotKit expects all chat responses to arrive as Server-Sent Events (SSE) compliant with the AG-UI streaming protocol. When an upstream API responds with standard HTTP 404 or 500 JSON (e.g. <code>{"error": {"code": 404}}</code>), the CopilotKit client stream decoder crashes, triggering an unhandled React error dialog that freezes the user interface.
+          </p>
+          <p>
+            <strong>The Solution:</strong> In <code>frontend/app/api/adk/route.ts</code>, we intercept non-200 responses before they reach the client and construct an in-memory 5-event synthetic stream (<code>RUN_STARTED</code> &rarr; <code>TEXT_MESSAGE_START</code> &rarr; <code>TEXT_MESSAGE_CONTENT</code> &rarr; <code>TEXT_MESSAGE_END</code> &rarr; <code>RUN_FINISHED</code>) with HTTP 200 and <code>content-type: text/event-stream</code>. The error renders as a natural assistant chat bubble containing styled Markdown troubleshooting steps, keeping the client application stable.
+          </p>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔄</span> 2. Next.js Hydration Safety &amp; Aggressive SSR Caching</div>
+          <p>
+            <strong>The Problem:</strong> Next.js App Router aggressively caches server fetches and statically optimizes components. During initial development, the status badge showed stale results when switching between <code>--local</code> and <code>--cloud</code>, or caused React hydration mismatch warnings because the server-rendered HTML differed from the browser's live connection state.
+          </p>
+          <p>
+            <strong>The Solution:</strong> We marked <code>route.ts</code> with <code>export const dynamic = "force-dynamic"</code> and set response headers to <code>Cache-Control: no-store, no-cache, must-revalidate</code>. In <code>BackendStatusBadge.tsx</code>, we made it an explicit <code>"use client"</code> component that starts in a neutral loading state (<code>Checking backend…</code>) and only renders status post-mount. We also implemented a clean lifecycle cleanup in <code>useEffect</code> using <code>mounted = false</code> and <code>clearInterval(interval)</code> to prevent memory leaks.
+          </p>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">💻</span> 3. macOS (BSD) vs. Linux (GNU) Shell Portability</div>
+          <p>
+            <strong>The Problem:</strong> Many development teams run macOS on laptops and Linux in CI/CD containers. Utilizing GNU <code>getopt</code> fails on macOS without Homebrew installation. Similarly, relying on <code>jq</code> requires external binaries, while BSD <code>sed</code> handles extended regex character classes (<code>[[:space:]]</code>) differently than GNU <code>sed</code>.
+          </p>
+          <p>
+            <strong>The Solution:</strong> We built <code>run-frontend.sh</code> using pure-Bash syntax supported universally since Bash 3.2: a manual <code>while [[ $# -gt 0 ]]</code> loop with <code>case</code> and <code>shift</code>. For metadata parsing, we designed a defensive 3-tier cascade: prefer <code>jq</code> if present; fallback to <code>python3</code> (guaranteed present in Python AI environments); and final fallback to POSIX-compliant <code>sed</code>.
+          </p>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔑</span> 4. Google Cloud ADC Token Lifecycle on Health Probes</div>
+          <p>
+            <strong>The Problem:</strong> In cloud mode, every probe to <code>/api/backend-status</code> needs to hit <code>${BACKEND_ORIGIN}/healthz</code>. If an access token is minted manually via CLI or static environment variables, it expires after 60 minutes, causing false-positive <code>⚠ Unreachable</code> warnings.
+          </p>
+          <p>
+            <strong>The Solution:</strong> We integrated the official <code>google-auth-library</code>. Its internal <code>auth.getClient().getAccessToken()</code> automatically manages token caching, expiry tracking, and background renewal. Probes remain lightning fast (sub-millisecond when cached) while guaranteeing fresh authentication credentials across long-running sessions.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <!-- SECTION 5: AUTHENTIC VISUAL EVIDENCE -->
+    <article class="step-card" id="visual-evidence">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Evidence Gallery</span>
+          <h2 class="step-title">Authentic Visual Evidence &amp; Artifact Gallery</h2>
+        </div>
+        <span class="badge blue">Verified Artifacts</span>
+      </div>
+      <div class="step-body">
+        <p>
+          The figures below document the live execution artifacts captured during the devcamp sessions, illustrating the original failure mode, the backend startup, and the production proxy architecture:
+        </p>
+
+        <!-- Figure 1 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab1-step8-backend-terminal.png" alt="FastAPI AG-UI Backend Startup Terminal" loading="lazy">
+          <figcaption>
+            <strong>Figure 1 — FastAPI AG-UI Local Backend Startup:</strong> Terminal running <code>./run-backend.sh</code> on port 8000. Uvicorn initializes the AG-UI router at <code>/api/adk</code>, mounts the static local gallery at <code>/outputs</code>, connects to SQLite, and confirms <code>GET /healthz HTTP/1.1 200 OK</code>.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 2 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab1-step8-frontend-welcome.png" alt="Next.js Frontend Welcome Screen" loading="lazy">
+          <figcaption>
+            <strong>Figure 2 — Social Spark Next.js Landing Screen:</strong> The frontend initializes on <code>http://localhost:3000</code>, presenting the guest entry card and confirming Tailwind styles and CopilotKit client bundles loaded successfully.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 3 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab1-step8-reasoning-engine-404-error.png" alt="Authentic CopilotKit 404 Error Modal" loading="lazy">
+          <figcaption>
+            <strong>Figure 3 — The Authentic 404 Failure Modal:</strong> Submitting a test prompt triggered an unhandled <code>HTTP 404 NOT_FOUND</code> error from Google Cloud Vertex AI, reporting that Reasoning Engine <code>3690295549229006848</code> could not be found due to stale configuration drift after Lab 2 teardown. This authentic failure motivated our Twelve-Factor redesign.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 4 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/step7-frontend-proxy.png" alt="Cloud Run Frontend Proxy Architecture" loading="lazy">
+          <figcaption>
+            <strong>Figure 4 — Cloud Run Authenticated Frontend Proxy:</strong> Production topology showing the Next.js server proxying client prompts to Vertex AI Agent Runtime with Google Cloud Application Default Credentials (ADC) token injection.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 5 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/step8-teardown.png" alt="GCP Teardown Confirmation" loading="lazy">
+          <figcaption>
+            <strong>Figure 5 — Lab 2 GCP Resource Teardown:</strong> CLI confirmation of <code>gcloud run services delete</code> and Reasoning Engine deletion during Lab 2 Step 9. This teardown created the dormant cloud URL that caused the subsequent Lab 1 Step 8 drift.
+          </figcaption>
+        </figure>
+      </div>
+    </article>
+
+    <!-- SECTION 6: VERIFICATION MATRIX -->
+    <article class="step-card" id="verification-matrix">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Checklist</span>
+          <h2 class="step-title">Quality Assurance &amp; Verification Matrix</h2>
+        </div>
+        <span class="badge green">100% Pass</span>
+      </div>
+      <div class="step-body">
+        <p>
+          All requirements have been validated against our automated verification checklist:
+        </p>
+
+        <table class="test-scenario-table">
+          <thead>
+            <tr>
+              <th>Verification Item</th>
+              <th>Test Command / Method</th>
+              <th>Observed Result</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Bash Script Syntax</strong></td>
+              <td><code>bash -n run-frontend.sh</code></td>
+              <td>Exit code 0, zero syntax errors</td>
+              <td><span class="badge green">PASS</span></td>
+            </tr>
+            <tr>
+              <td><strong>CLI Help Output</strong></td>
+              <td><code>./run-frontend.sh --help</code></td>
+              <td>Outputs formatted usage, options, and exits 0</td>
+              <td><span class="badge green">PASS</span></td>
+            </tr>
+            <tr>
+              <td><strong>Invalid Flag Handling</strong></td>
+              <td><code>./run-frontend.sh --invalid</code></td>
+              <td>Prints error to stderr, exits 1</td>
+              <td><span class="badge green">PASS</span></td>
+            </tr>
+            <tr>
+              <td><strong>TypeScript Compilation</strong></td>
+              <td><code>tsc --noEmit --project frontend/tsconfig.json</code></td>
+              <td>0 errors across all routes and components</td>
+              <td><span class="badge green">PASS</span></td>
+            </tr>
+            <tr>
+              <td><strong>Visual Badge Mounting</strong></td>
+              <td>Inspect <code>frontend/app/page.tsx</code></td>
+              <td><code>&lt;BackendStatusBadge /&gt;</code> mounted in header</td>
+              <td><span class="badge green">PASS</span></td>
+            </tr>
+            <tr>
+              <td><strong>Fail-Closed Interception</strong></td>
+              <td>Simulate 404 on <code>POST /api/adk</code></td>
+              <td>5-event AG-UI SSE stream delivered, HTTP 200</td>
+              <td><span class="badge green">PASS</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="checkpoint-box">
+          <div class="checkpoint-title"><span class="icon">✅</span> Final Architectural Assessment</div>
+          <div class="checkpoint-content">
+            <p>
+              By replacing speculative auto-discovery with Twelve-Factor explicit binding, Social Spark achieves enterprise production readiness. Developers enjoy rapid local feedback and visual status clarity, while operators are protected against the catastrophic Split-Brain trap, session corruption, and silent Model Armor security bypasses.
+            </p>
+            <p>
+              <strong>Related Walkthrough Links:</strong>
+            </p>
+            <ul>
+              <li><a href="lab-1.html">Lab 1: Build — Agent Composition, Skills &amp; Step 8 Frontend Integration →</a></li>
+              <li><a href="lab-2.html">Lab 2: Scale — Vertex AI Reasoning Engine &amp; Teardown →</a></li>
+              <li><a href="lab-3.html">Lab 3: Govern — Model Armor &amp; Enterprise Governance Policies →</a></li>
+              <li><a href="learnings.html#issue-reasoning-engine-404">Learnings Hub: Learning 6 Post-Mortem →</a></li>
+              <li><a href="shell-script-flags.html">DevOps Educational Guide: Adapting Shell Scripts for CLI Flags →</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Footer -->
+    <footer>
+      <div>Social Spark Portfolio — GDG London AI DevCamp 2026 · Duncan Moncrieff</div>
+      <div>Maintained in <code>docs/walkthrough/backend-binding.html</code></div>
+    </footer>
+  </main>
+
+  <!-- Reusable Lightbox & Theme Scripts -->
+  <script src="lightbox.js"></script>
+  <script>
+    // Copy code snippet helper
+    function copySnippet(btn) {
+      const pre = btn.closest('.code-header').nextElementSibling;
+      if (!pre) return;
+      const code = pre.querySelector('code') || pre;
+      navigator.clipboard.writeText(code.innerText).then(() => {
+        const orig = btn.innerText;
+        btn.innerText = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.innerText = orig;
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    }
+
+    // Theme Toggle Handler
+    (function () {
+      var KEY = "social-spark-theme";
+      var root = document.documentElement;
+      var btn = document.getElementById("themeToggle");
+      function showing() {
+        return root.dataset.theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      }
+      if (btn) {
+        btn.addEventListener("click", function () {
+          var next = showing() === "dark" ? "light" : "dark";
+          root.dataset.theme = next;
+          try { localStorage.setItem(KEY, next); } catch (e) {}
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

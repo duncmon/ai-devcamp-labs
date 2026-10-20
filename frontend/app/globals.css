@@ -683,3 +683,98 @@ a {
     padding: 20px 14px 40px;
   }
 }
+
+/* ---------- Backend Status Badge (Principle 2) ---------- */
+.backend-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--g-grey-300);
+  background: #ffffff;
+  color: var(--g-grey-600);
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.backend-badge:hover {
+  filter: brightness(0.96);
+}
+
+.backend-badge .badge-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.backend-badge .badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.backend-badge.badge-local {
+  border-color: #a8dab5;
+  background: var(--g-green-tint);
+  color: #137333;
+}
+
+.backend-badge.badge-local .dot-green {
+  background: var(--g-green);
+  box-shadow: 0 0 0 2px rgba(52, 168, 83, 0.25);
+}
+
+.backend-badge.badge-cloud {
+  border-color: #aecbfa;
+  background: var(--g-blue-tint);
+  color: var(--g-blue);
+}
+
+.backend-badge.badge-cloud .badge-icon {
+  color: var(--g-blue);
+}
+
+.backend-badge.badge-unreachable {
+  border-color: #f6aea9;
+  background: #fce8e6;
+  color: #c5221f;
+}
+
+.backend-badge.badge-unreachable .badge-icon {
+  color: var(--g-red);
+}
+
+.backend-badge.badge-loading {
+  background: var(--g-grey-100);
+  color: var(--g-grey-600);
+}
+
+.dot-pulsing {
+  background: var(--g-grey-600);
+  animation: pulse-dot 1.4s infinite ease-in-out;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+@media (max-width: 640px) {
+  .backend-badge {
+    font-size: 11.5px;
+    padding: 2px 8px;
+  }
+}
+
