@@ -1066,6 +1066,46 @@ $ curl -s http://localhost:3000/api/backend-status | jq .
             <strong>Figure 19 — CopilotKit Client-Side Timeout Crash:</strong> When the container retried the 400 error across 6 exponential attempts (1.5s to 32s = ~78s total), CopilotKit reached its client socket timeout and failed with <code>[CopilotKit] Agent error: "Execution timed out"</code>. Resolved via our self-healing location override in <code>guardrails.py</code> and regional deployment flags.
           </figcaption>
         </figure>
+
+        <!-- Figure 20 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab1-step9-golden-path-rust-post-image.png" alt="Golden Path Cloud Execution with In-Chat Image Preview" loading="lazy">
+          <figcaption>
+            <strong>Figure 20 — Golden Path Cloud Execution &amp; In-Chat Multimodal Preview:</strong> Full end-to-end execution of Social Spark on Vertex AI Agent Runtime under the cloud launch profile (<code>☁ Vertex AI (us-central1:...)</code>). The user prompt (<em>"Give me a post for linkedin on Rust vs C and C++ what's good, what's not. Make sure that you include an image please"</em>) progressed through all pipeline stages (Idea &rarr; Memory &rarr; Researching &rarr; Drafting &rarr; Approval). The draft copy is formatted with technical precision, and the high-resolution generated illustration (clockwork gear mechanism powering modern infrastructure) renders seamlessly in the CopilotKit chat via the secure <code>/outputs</code> proxy.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 21 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab1-step9-golden-path-activity-feed.png" alt="Expandable Agent Activity Feed Drawer" loading="lazy">
+          <figcaption>
+            <strong>Figure 21 — Expandable Agent Activity Drawer:</strong> Detailed inspection drawer verifying execution of top-level orchestrator tool invocations: <code>load_memory</code> (past post tone grounding), <code>research_agent</code> (web context gathering), and <code>draft_agent</code> (post synthesis and multimodal asset coordination).
+          </figcaption>
+        </figure>
+
+        <!-- Figure 22 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab1-step9-cloud-console-state-urls.png" alt="Cloud Console Playground State and URL Resolution" loading="lazy">
+          <figcaption>
+            <strong>Figure 22 — Cloud Console Playground State &amp; URL Decoupling:</strong> Serverless runtime state on Reasoning Engine <code>1836136314752204800</code> verifying clean separation of display and storage concerns: <code>current_image_path</code> points to the container filesystem (<code>/code/gallery/...</code>), <code>current_image_display_url</code> targets the authenticated proxy route (<code>/outputs/...</code>), and <code>current_image_url</code> resolves to the authentic Cloud Storage URL (<code>https://storage.googleapis.com/lab2-bucket-ai-devcamp-duncan-395792/post-images/...</code>), eliminating the synthetic <code>dry-run-bucket</code> placeholder.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 23 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab2-step3-gcs-bucket-post-images-folder.png" alt="Cloud Storage Bucket Directory Structure" loading="lazy">
+          <figcaption>
+            <strong>Figure 23 — Google Cloud Storage Persistent Asset Verification:</strong> Bucket browser for <code>lab2-bucket-ai-devcamp-duncan-395792</code> in <code>us-central1</code> confirming the active <code>post-images/</code> folder created alongside persistent JSON posts in <code>posts/</code>.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 24 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab2-step3-gcs-object-details-rust-gear.png" alt="GCS Object Details for Generated Image Asset" loading="lazy">
+          <figcaption>
+            <strong>Figure 24 — Generated Image Asset Details in Cloud Storage:</strong> Inspection of <code>post-images/1792592931-6173a295.png</code> in Google Cloud Console. The 1.5MB PNG binary created by <code>gemini-2.5-flash-image</code> is verified safely archived in GCS, proving complete end-to-end multimodal persistence.
+          </figcaption>
+        </figure>
       </div>
     </article>
 
