@@ -29,6 +29,7 @@
       <a href="learnings.html" class="active">Our Learnings</a>
       <a href="backend-binding.html">Backend Binding</a>
       <a href="shell-script-flags.html">CLI Flags</a>
+      <a href="stepper-and-buffer-confirmation.html">Stepper &amp; Confirmation</a>
       <a href="https://sonikajanagill.com/ai-devcamp-labs/doc-viewer.html?src=LEARNINGS.md" target="_blank" rel="noopener" class="upstream-pill">
         Instructor LEARNINGS.md (Sonika Gill) ↗
       </a>
@@ -72,6 +73,7 @@
               <li><a href="#issue-search-mixing">4. Native Search Grounding vs. Custom Tool Mixing</a></li>
               <li><a href="#issue-gcs-preview">5. GCS Image URL Preview vs. Public Access Trap</a></li>
               <li><a href="#issue-reasoning-engine-404">6. Stale Remote Engine Origin vs. Local AG-UI Bridge</a></li>
+              <li><a href="#issue-stepper-confirmation">27. In-Flight Stepper Sync &amp; Double-Confirmation Gate</a></li>
             </ul>
           </div>
           <div>
@@ -1050,6 +1052,63 @@ if key and key.lower() not in ("none", "unset", "use_secret", "secret_manager", 
           <div class="callout tip">
             <strong>Key Takeaway for Enterprise Agent Governance:</strong> Operational security in agentic workflows cannot rely on conversational memory or human vigilance alone. True production safety requires deterministic client-side CLI interceptors that mechanically reject commands containing high-entropy strings or known credential patterns before execution.
           </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-stepper-confirmation">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 27 · Build &amp; Observability</span>
+          <h2 class="step-title">In-Flight Pipeline Stepper Synchronization &amp; The Premature Tool Execution Double-Confirmation Gate</h2>
+        </div>
+        <span class="badge blue">UX &amp; HITL Mechanics</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> The Dual Symptoms Encountered in Golden Path Verification</div>
+          <p>
+            During empirical validation of the multimodal Buffer MCP publishing flow (Lab 1 Step 9), two subtle operational friction points degraded the attendee experience:
+          </p>
+          <ol>
+            <li><strong>Stepper Progression Lag:</strong> While <code>draft_agent</code> was actively generating the post copy and multimodal visual prompt, the dashboard's top horizontal stepper remained stationary on <em>Researching</em>. Only when drafting concluded did the stepper jump directly to <em>Approval</em>, skipping the visible <em>Drafting</em> stage.</li>
+            <li><strong>The Double-Confirmation Prompt:</strong> Authorizing publication required clicking <strong>Approve</strong> twice in the CopilotKit chat, creating duplicate <em>"Responded."</em> entries and spawning parallel <code>adk_request_confirmation</code> spans.</li>
+          </ol>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🧬</span> Root Cause 1: The ADK Event Lifecycle vs. Live Message Streams</div>
+          <p>
+            In Google ADK, <code>before_tool_callback</code> hooks execute synchronously inside the Python backend process. While updating <code>tool_context.state["pipeline_stage"] = "drafting"</code> modifies session state in memory, <strong>ADK does not emit an SSE event when a tool begins execution</strong>. Events containing <code>actions.state_delta</code> are only generated when a tool completes and returns a <code>FunctionResponse</code>, or upon final turn completion (<code>STATE_SNAPSHOT</code>).
+          </p>
+          <p>
+            Because CopilotKit's <code>useCoAgent</code> hook solely listens for state snapshot events, <code>state.pipeline_stage</code> remained frozen on <code>researching</code> for the entire 15-second duration of <code>draft_agent</code>. Conversely, <code>ActivityFeed.tsx</code> inspects <code>useCopilotChatInternal()</code>'s streaming message array; as soon as the Gemini model generated a <code>toolCalls: [{name: "draft_agent"}]</code> payload, the activity drawer displayed <code>draft_agent: running…</code>.
+          </p>
+          <p>
+            <strong>The Solution:</strong> Updated <code>frontend/app/components/StagePanel.tsx</code> to inspect live in-flight tool calls via <code>useCopilotChatInternal()</code>. When an uncompleted <code>draft_agent</code> invocation is detected in the stream, the stepper immediately transitions to <strong>✍️ Drafting</strong> with zero latency.
+          </p>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🛡️</span> Root Cause 2: Premature Tool Calling &amp; The Double Confirmation Gate</div>
+          <p>
+            In Buffer's MCP server, <code>create_post</code> strictly requires a 24-character hexadecimal <code>channelId</code>. When the user approved the draft (<em>"lets set this up for posting!"</em>), the orchestrator optimistically invoked <code>create_post(mode="addToQueue", text="...")</code> without first querying <code>get_account</code> and <code>list_channels</code>.
+          </p>
+          <p>
+            Because <code>create_post</code> is protected by <code>require_confirmation=True</code>, ADK paused execution and rendered the interactive approval card. The attendee clicked <strong>Approve (#1)</strong>. Buffer's remote server executed the tool, which failed immediately with <code>Missing required field: channelId</code>. The orchestrator caught this error, resolved the channel ID via <code>get_account</code> &rarr; <code>list_channels</code>, and called <code>create_post</code> a second time—triggering ADK's confirmation gate <strong>Approve (#2)</strong>!
+          </p>
+          <p>
+            <strong>The Solution:</strong>
+          </p>
+          <ul>
+            <li><strong>Mandatory Sequence Invariant:</strong> Updated <code>_BUFFER_CHANNEL_LOOKUP</code> and <code>root_agent.instruction</code> mandating that <code>channelId</code> must be discovered via <code>get_account</code> &rarr; <code>list_channels</code> <em>before</em> calling <code>create_post</code>.</li>
+            <li><strong>Session State Caching &amp; Defensive Injection:</strong> Cached primary <code>buffer_channel_id</code> in <code>_track_stage</code>, and added auto-injection in <code>_delay_buffer_post</code> if <code>channelId</code> is ever omitted. The initial call is now completely formed with both channel ID and image asset, ensuring the confirmation gate prompts exactly once.</li>
+          </ul>
+          <p style="margin-top: 14px;">
+            <a href="stepper-and-buffer-confirmation.html" class="subpage-card-link" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--accent);">
+              <span>📖 Read the full technical annexe with interactive diagrams &amp; code diffs</span> &rarr;
+            </a>
+          </p>
         </div>
       </div>
     </article>

@@ -29,6 +29,7 @@
       <a href="learnings.html">Our Learnings</a>
       <a href="backend-binding.html">Backend Binding</a>
       <a href="shell-script-flags.html">CLI Flags</a>
+      <a href="stepper-and-buffer-confirmation.html">Stepper &amp; Confirmation</a>
       <a href="https://sonikajanagill.com/ai-devcamp-labs/lab-1-build.html" target="_blank" rel="noopener" class="upstream-pill">
         Upstream Lab 1 (Sonika Gill) ↗
       </a>
@@ -902,15 +903,55 @@ linkedin_toolset = McpToolset(
           </figure>
         </div>
 
+        <div class="part-section" id="step9-refinements">
+          <div class="part-label"><span class="icon">🔧</span> 3. Step 9 Verification Refinements: Stepper Synchronization &amp; Buffer Single-Confirmation Gate</div>
+          <p>
+            During empirical validation of the multimodal Buffer MCP publishing flow, two subtle operational friction points were identified and resolved on our path towards complete production fidelity:
+          </p>
+          <ol>
+            <li>
+              <strong>Pipeline Stepper Latency Gap:</strong> While <code>draft_agent</code> was actively executing copy and visual prompt generation in the background, the UI's top horizontal stepper remained visually stationary on <em>Researching</em> until completion, momentarily skipping the visible <em>Drafting</em> stage. This occurred because ADK tool callbacks run in-process without emitting SSE state deltas until tool completion.
+            </li>
+            <li>
+              <strong>Buffer Double-Confirmation Gate:</strong> Authorizing publication required clicking <strong>Approve</strong> twice in the CopilotKit chat. This happened because the orchestrator prematurely invoked <code>create_post</code> before resolving the required <code>channelId</code> via <code>get_account</code> &rarr; <code>list_channels</code>, triggering a first approval gate that failed upstream in Buffer, followed by channel resolution and a second approval gate.
+            </li>
+          </ol>
+
+          <figure class="evidence-figure" style="margin-top: 20px;">
+            <img src="../screenshots/lab1-step9-buffer-stepper-lag.png" alt="Lab 1 Step 9: Stepper Lag Symptom during Subagent Drafting" loading="lazy">
+            <figcaption>
+              <strong>Figure 9.7 — Pipeline Stepper Latency Gap (Empirical Symptom):</strong> Captured during live testing. The Agent Activity drawer confirms <code>research_agent</code> is done and <code>draft_agent</code> is running, yet the top pipeline stepper remained stuck on <em>Researching</em>. Resolved in <code>frontend/app/components/StagePanel.tsx</code> by reading in-flight subagent tool calls directly from <code>useCopilotChatInternal()</code>.
+            </figcaption>
+          </figure>
+
+          <figure class="evidence-figure" style="margin-top: 24px;">
+            <img src="../screenshots/lab1-step9-buffer-double-confirmation.png" alt="Lab 1 Step 9: Double Confirmation Prompt in CopilotKit Chat" loading="lazy">
+            <figcaption>
+              <strong>Figure 9.8 — The Double-Confirmation Gate (Empirical Symptom):</strong> Activity drawer trace showing stacked <code>adk_request_confirmation</code> spans and duplicate <em>"Responded."</em> entries caused by premature <code>create_post</code> execution prior to channel discovery. Resolved by strictly requiring channel pre-lookup in prompts, caching <code>buffer_channel_id</code> in session state, and auto-populating <code>channelId</code> defensively in <code>_delay_buffer_post</code>.
+            </figcaption>
+          </figure>
+
+          <div class="callout tip" style="margin-top: 20px;">
+            <strong>In-Depth Architectural Analysis &amp; Dedicated Annexe:</strong><br>
+            A full breakdown of this investigation, including sequence diagrams of the ADK event lifecycle and complete code diffs, is documented in <a href="learnings.html#issue-stepper-confirmation"><strong>Learning 27 (In-Flight Pipeline Stepper Synchronization &amp; The Premature Tool Execution Double-Confirmation Gate)</strong></a> and our dedicated technical annexe:
+            <div style="margin-top: 10px;">
+              <a href="stepper-and-buffer-confirmation.html" class="subpage-card-link" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--accent);">
+                <span>📖 View the Dedicated Annexe: In-Flight Stepper Synchronization &amp; Single Confirmation Gate</span> &rarr;
+              </a>
+            </div>
+          </div>
+        </div>
+
         <div class="part-section">
           <div class="checkpoint-box">
             <div class="checkpoint-title"><span class="icon">✅</span> Step 9 Checkpoint: The Complete Golden Path Verification</div>
             <div class="checkpoint-content">
               <p><strong>Requirement:</strong> The stage panel tracks the run live (Idea → Researching → Drafting → Approval → Posted); activity feed shows every tool call with expandable arguments/results; confirmation card appears before publishing; on Approve, response appears in chat.</p>
-              <p><strong>Fulfillment:</strong> Fully verified across both publishing backends:</p>
+              <p><strong>Fulfillment:</strong> Fully verified across both publishing backends with zero regressions:</p>
               <ul style="margin-top: 6px; padding-left: 20px;">
                 <li><strong>LinkedIn Golden Path (Figures 9.1 &amp; 9.2):</strong> All 6 pipeline stages completed live on <code>localhost:8090</code> and Vertex AI Agent Runtime, with Imagen multimodal illustration saved to GCS (<code>lab2-bucket-ai-devcamp-duncan-395792</code>), interactive confirmation card, and posted state transition.</li>
                 <li><strong>Buffer Golden Path (Figures 9.3–9.6):</strong> Verified end-to-end execution through the remote Buffer MCP publisher. Figure 9.3 shows the interactive confirmation gate with GCS signed media URL; Figure 9.4 shows successful dispatch with green <code>BUFFER</code> badge and post ID <code>68f7b7cb34757c96cfd1f855</code>; and Figures 9.5 &amp; 9.6 corroborate the scheduled post live in the Buffer dashboard queue and LinkedIn preview modal.</li>
+                <li><strong>Observability &amp; Single-Gate Hardening (Figures 9.7 &amp; 9.8):</strong> Eliminated subagent progression lag in <code>StagePanel.tsx</code> via live tool inspection, and eliminated duplicate confirmation prompts through prompt prerequisites, state caching, and defensive channel injection (detailed in <a href="learnings.html#issue-stepper-confirmation">Learning 27</a> and <a href="stepper-and-buffer-confirmation.html">Annexe</a>).</li>
               </ul>
             </div>
           </div>
