@@ -572,6 +572,25 @@ def _delay_buffer_post(
                 args["dueAt"],
                 BUFFER_REVIEW_DELAY_MINUTES,
             )
+
+        # Deterministically attach image asset to Buffer if available in session state
+        if not args.get("assets") and tool_context:
+            image_url = tool_context.state.get("current_image_url")
+            if not image_url and tool_context.state.get("current_image_path"):
+                from backend.social_poster.tools import upload_image
+                upload_res = upload_image(tool_context.state["current_image_path"])
+                if upload_res.get("status") == "success" and upload_res.get("url"):
+                    image_url = upload_res["url"]
+                    tool_context.state["current_image_url"] = image_url
+            if image_url:
+                args["assets"] = [{"image": {"url": image_url}}]
+                log.info("Auto-attached image asset to Buffer create_post: %s", image_url)
+    elif tool.name == "linkedin_create_post":
+        if not args.get("image_path") and tool_context:
+            img_path = tool_context.state.get("current_image_path")
+            if img_path and pathlib.Path(img_path).exists():
+                args["image_path"] = img_path
+                log.info("Auto-attached image_path to linkedin_create_post: %s", img_path)
     return None
 
 # --- Pipeline stage, surfaced to the frontend via AG-UI shared state ----------
@@ -586,6 +605,16 @@ _TOOL_STAGES = {
     "memory_agent": "consulting_memory",
     "load_memory": "consulting_memory",
 }
+
+
+def _track_stage_before_tool(
+    tool: BaseTool, args: dict[str, Any], tool_context: ToolContext
+) -> Optional[dict]:
+    """Updates pipeline_stage synchronously as soon as a tool/agent begins,
+    so the frontend stepper transitions immediately to Researching or Drafting."""
+    if tool.name in _TOOL_STAGES:
+        tool_context.state["pipeline_stage"] = _TOOL_STAGES[tool.name]
+    return None
 
 
 def _init_stage(callback_context: CallbackContext) -> None:
@@ -685,10 +714,12 @@ _MEMORY_ROUTING = f"""
 
 if use_buffer and use_gcs:
     _BUFFER_IMAGE_NOTE = """
-  Buffer's create_post CAN include an image now: pass the public HTTPS URL
-  that draft_agent got from upload_image — never a local file path, Buffer's
-  servers cannot fetch those (confirmed live: "Invalid post: Image could not
-  be read from its URL")."""
+  Buffer's create_post CAN include an image: if an image was generated or uploaded
+  for this post, the backend publishing hook automatically attaches the Cloud Storage
+  asset to create_post upon execution. You do not need to format the raw assets parameter
+  or worry if the signed URL is omitted from draft notes — it is automatically bound from
+  session state. Never state or apologize that an illustration cannot be included when
+  an image was generated."""
 elif use_buffer:
     _BUFFER_IMAGE_NOTE = """
   IMPORTANT: Buffer's create_post must be TEXT ONLY — never pass an image
@@ -816,6 +847,17 @@ def _sanitize_and_fix_image_markdown(
             text = re.sub(r"\[IMAGE:\s*([^\]]+)\]", r"![post image](\1)", text)
             modified = True
 
+        # 4. Strip any inaccurate apologies about images not being attached to Buffer
+        if display_url or callback_context.state.get("current_image_url"):
+            cleaned_text = re.sub(
+                r"(?i)\b(?:Please note that )?the illustration could not be included in the Buffer post[^.\n]*\.?\n?",
+                "",
+                text,
+            ).strip()
+            if cleaned_text != text:
+                text = cleaned_text
+                modified = True
+
         if text != part.text:
             modified = True
             new_parts.append(genai_types.Part.from_text(text=text))
@@ -917,7 +959,11 @@ Posting rules (strict):
         guardrails.friendly_block,
         _sanitize_and_fix_image_markdown,
     ],
-    before_tool_callback=[_delay_buffer_post, guardrails.redact_before_post],
+    before_tool_callback=[
+        _track_stage_before_tool,
+        _delay_buffer_post,
+        guardrails.redact_before_post,
+    ],
     after_tool_callback=_track_stage,
     after_agent_callback=_stage_after_agent,
 )
