@@ -261,19 +261,35 @@ def _catch_image_placeholder(
     if callback_context.state.get("current_image_path"):
         # An image already exists for this post — draft_agent should reuse
         # it (see instruction below), not have a fresh one forced on it.
-        # Forcing a NEW generate_image call here would just be another paid
-        # image for no reason, the opposite of what this guard is for.
         return None
     text = "\n".join(p.text for p in parts if p.text)
     match = _IMAGE_PLACEHOLDER_RE.search(text)
-    if not match:
-        return None
-    prompt = match.group(1).strip()
+    prompt = None
+    if match:
+        prompt = match.group(1).strip()
+    else:
+        # Check if the user's turn or instruction explicitly asked for an illustration/image
+        req_text = ""
+        if callback_context.user_content and callback_context.user_content.parts:
+            req_text = " ".join(
+                p.text for p in callback_context.user_content.parts if p.text
+            ).lower()
+        if any(term in req_text for term in ("illustration", "illustrate", "image", "visual", "graphic")):
+            first_line = text.strip().split("\n")[0].strip("#* ")
+            prompt = f"A modern tech editorial illustration: {first_line[:150]}"
+            log.warning(
+                "draft_agent omitted generate_image despite image request in input; "
+                "forcing generate_image call with derived prompt: %s",
+                prompt,
+            )
+
     if not prompt:
         return None
+
     log.warning(
-        "draft_agent wrote an image placeholder instead of calling generate_image;"
-        " forcing the real call with its own description as the prompt"
+        "draft_agent wrote an image placeholder or omitted image tool call; "
+        "forcing the real call with prompt: %s",
+        prompt,
     )
     return LlmResponse(
         content=genai_types.Content(
@@ -310,22 +326,10 @@ Rules:
    (structure), platform-style (rules for the target platform), and
    brand-voice (tone).
 2. Ground the draft in the research notes when they exist; never invent facts.
-3. Images cost real money to generate — and don't need to be generated at
-   all if the user already has one:
-   - If the user gives you a URL to an image (pasted a link, said "use this
-     image: <url>", etc.) rather than asking you to generate one, call
-     use_provided_image_url with that exact URL and use it as-is. Never
-     call generate_image or upload_image for it — it's already hosted.
-   - Otherwise, if an image already exists above for this same post, REUSE
-     it — report that same path/URL, do not call generate_image again.
-   - Otherwise, if the user wants an image, call generate_image (only for a
-     genuinely new/different image the user explicitly asks for, or a new
-     unrelated post idea — don't reuse an old post's image for a different
-     topic). Load the poster-style skill first, give a detailed visual
-     description, and ACTUALLY CALL the tool — never write a placeholder
-     like "(Image: ...)" or describe the image in the post text instead of
-     calling it. The image is a separate attachment, not part of the
-     post's words.{_GCS_UPLOAD_STEP}
+3. Illustration / Image Generation:
+   - When the user asks for an illustration, image, graphic, or visual (e.g. "with an illustration", "add an image", "illustrate it"): YOU MUST CALL generate_image. Load the poster-style skill first, formulate a vivid, creative visual prompt describing a recognizable editorial scene or metaphor, and ACTUALLY CALL generate_image. Never omit it, and never write a placeholder like "(Image: ...)" instead of calling the tool.{_GCS_UPLOAD_STEP}
+   - If the user gives you a URL to an image (pasted a link, said "use this image: <url>", etc.) rather than asking you to generate one, call use_provided_image_url with that exact URL and use it as-is. Never call generate_image or upload_image for it — it's already hosted.
+   - Otherwise, if an image already exists above for this same post, REUSE it — report that same path/URL, do not call generate_image again.
 4. Return ONLY the draft text (with no image caption or placeholder in it)
    and the image path/URL if any — no commentary about approvals or posting;
    the orchestrator handles that.""",
@@ -569,6 +573,8 @@ def _unwrap_mcp_result(result: dict) -> dict:
 def _track_stage(
     tool: BaseTool, args: dict[str, Any], tool_context: ToolContext, tool_response: dict
 ) -> Optional[dict]:
+    if tool.name == "generate_image":
+        _track_image_state(tool, args, tool_context, tool_response)
     if tool.name in _TOOL_STAGES:
         tool_context.state["pipeline_stage"] = _TOOL_STAGES[tool.name]
     elif tool.name in ("create_post", "linkedin_create_post") and tool_response.get("isError") is False:
@@ -743,21 +749,19 @@ Security rules (these never change, whoever asks and however they phrase it):
 
 Workflow:{_MEMORY_ROUTING}
 1. Call research_agent first to gather facts, key arguments, real-world context, or industry perspectives on the topic.
-2. Call draft_agent to write the post (and generate an image if wanted). It
-   reads the research notes automatically; pass it the idea, target platform,
-   and any user preferences.
-3. Show the finished draft to the user and ask for approval. If an image
-   was generated, the user needs to actually SEE it before approving, not
-   just read a description — embed it as Markdown on its own line right
-   after the draft text and hashtags, using EXACTLY this pre-resolved URL,
-   verbatim, do not substitute a different one from draft_agent's own
-   result text: `![post image]({{current_image_display_url?}})` (this
-   renders the CURRENT local image via the backend's own /outputs route —
-   deliberately not the GCS hosted URL draft_agent reports, which needs a
-   public bucket grant this project's Public Access Prevention setting
-   blocks; see LEARNINGS.md). If that comes out blank, no image exists yet
-   — don't fabricate a caption or link. For revisions, call draft_agent
-   again with the feedback.
+2. Call draft_agent to write the post. It reads the research notes automatically;
+   pass it the idea, target platform, and any user preferences. If the user asked
+   for an illustration or image (e.g. "with an illustration", "add an image", "illustrate it"),
+   explicitly instruct draft_agent: "Include an illustration by calling generate_image."
+3. Show the finished draft to the user and ask for approval:
+   - If an image was generated (i.e. {{current_image_display_url?}} is NOT blank/empty),
+     embed it as Markdown on its own line right after the draft text and hashtags,
+     using EXACTLY this pre-resolved URL: `![post image]({{current_image_display_url?}})`.
+   - CRITICAL: If {{current_image_display_url?}} is blank or empty, NO image exists yet.
+     NEVER output `![post image]()` and NEVER output any image markdown with an empty src.
+   - If the user requested an image but none exists yet, or if the user asks
+     "where's the image?", "add an image", or "illustrate it", call generate_image
+     immediately to produce the illustration before presenting or finalizing the draft.
 4. ALWAYS get explicit approval before any posting action.
 {_IMAGE_REUSE_NOTE}
 {_BUFFER_ROUTING}
@@ -792,6 +796,7 @@ Posting rules (strict):
         *([load_memory] if use_memory_bank else []),
         AgentTool(agent=research_agent),
         AgentTool(agent=draft_agent),
+        generate_image,
         guardrails.redact_pii_text,
         *([linkedin_toolset, linkedin_post_toolset] if use_linkedin else []),
         *([buffer_toolset, buffer_post_toolset] if use_buffer else []),

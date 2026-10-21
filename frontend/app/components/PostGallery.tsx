@@ -201,7 +201,7 @@ export function PostGallery() {
             const isLong = p.text.length > TILE_TEXT_PREVIEW_LIMIT;
             return (
               <li key={p.id} className="gallery-tile">
-                {p.imageUrl && (
+                {p.imageUrl && p.imageUrl.trim() !== "" && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img className="gallery-tile-image" src={p.imageUrl} alt="" />
                 )}
