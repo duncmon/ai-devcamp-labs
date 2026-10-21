@@ -1,6 +1,7 @@
 """Custom tools for the social_poster agent."""
 
 import datetime
+import logging
 import os
 import pathlib
 import time
@@ -13,6 +14,8 @@ import google.auth.impersonated_credentials
 from google import genai
 from google.cloud import storage
 from google.genai import types as genai_types
+
+log = logging.getLogger(__name__)
 
 # Images land in a gallery/ directory at this repo's root.
 OUTPUTS_DIR = pathlib.Path(__file__).resolve().parents[2] / "gallery"
@@ -29,8 +32,9 @@ def generate_image(prompt: str) -> dict:
 
     Returns:
         dict with 'status', and on success 'image_path' (local file path)
-        or on failure an 'error' message.
+        and optional 'image_url' (if GCS is configured), or on failure an 'error' message.
     """
+    log.info("generate_image called with prompt: %s", prompt)
     configured_model = os.environ.get("IMAGE_MODEL_ID")
     candidate_models = []
     if configured_model and configured_model.strip():
@@ -57,6 +61,7 @@ def generate_image(prompt: str) -> dict:
 
     for model in candidate_models:
         try:
+            log.info("generate_image: attempting model %s", model)
             response = client.models.generate_content(
                 model=model,
                 contents=prompt,
@@ -66,6 +71,7 @@ def generate_image(prompt: str) -> dict:
             )
             if not response.candidates:
                 last_error = "Model returned no candidates"
+                log.warning("generate_image: model %s returned no candidates", model)
                 continue
 
             parts = getattr(response.candidates[0].content, "parts", []) or []
@@ -77,20 +83,38 @@ def generate_image(prompt: str) -> dict:
                     ext = part.inline_data.mime_type.split("/")[-1]
                     path = OUTPUTS_DIR / f"post-image-{int(time.time())}-{uuid.uuid4().hex[:8]}.{ext}"
                     path.write_bytes(part.inline_data.data)
-                    return {"status": "success", "image_path": str(path), "model_used": model}
+                    log.info("generate_image: successfully generated image with model %s at %s", model, path)
+
+                    result = {"status": "success", "image_path": str(path), "model_used": model}
+
+                    # If GCS bucket is configured, also persist to GCS
+                    if os.environ.get("GCS_BUCKET_NAME"):
+                        try:
+                            upload_res = upload_image(str(path))
+                            if upload_res.get("status") == "success" and upload_res.get("url"):
+                                result["image_url"] = upload_res["url"]
+                                log.info("generate_image: auto-persisted to GCS -> %s", upload_res["url"])
+                        except Exception as upload_err:
+                            log.warning("generate_image: GCS auto-upload non-fatal error: %s", upload_err)
+
+                    return result
 
             if not has_image:
                 last_error = "Model response contained no image data"
+                log.warning("generate_image: model %s response contained no image data", model)
                 continue
         except Exception as e:
             err_str = str(e)
             last_error = err_str
             # If model is 404 NOT_FOUND, try next candidate in priority cascade
             if "404" in err_str or "not found" in err_str.lower():
+                log.warning("generate_image: candidate model %s returned 404 NOT_FOUND; falling back to next candidate...", model)
                 continue
             # For other errors (e.g. safety filter, 429), return immediately
+            log.error("generate_image: non-404 error on model %s: %s", model, err_str)
             return {"status": "error", "error": err_str}
 
+    log.error("generate_image: all candidate models failed: %s. Last error: %s", candidate_models, last_error)
     return {"status": "error", "error": last_error or f"All image candidate models failed: {candidate_models}"}
 
 

@@ -105,3 +105,25 @@ def test_generate_image_returns_error_when_candidate_has_no_image_part(monkeypat
 
     assert result["status"] == "error"
     assert "no image data" in result["error"].lower()
+
+
+def test_generate_image_persists_to_gcs_when_bucket_configured(monkeypatch, tmp_path):
+    class _FakeInlineData:
+        mime_type = "image/png"
+        data = b"\x89PNG\r\n\x1a\nFakeData"
+
+    response = _FakeResponse(candidates=[_FakeCandidate(parts=[_FakePart(inline_data=_FakeInlineData())])])
+    monkeypatch.setattr(tools.genai, "Client", lambda **kwargs: _FakeClient(response))
+    monkeypatch.setattr(tools, "OUTPUTS_DIR", tmp_path)
+    monkeypatch.setenv("GCS_BUCKET_NAME", "my-test-bucket")
+    monkeypatch.setattr(
+        tools,
+        "upload_image",
+        lambda path: {"status": "success", "url": "https://storage.googleapis.com/my-test-bucket/image.png"},
+    )
+
+    result = tools.generate_image("a futuristic skyline")
+    assert result["status"] == "success"
+    assert "image_path" in result
+    assert result["image_url"] == "https://storage.googleapis.com/my-test-bucket/image.png"
+
