@@ -168,8 +168,9 @@ def _track_image_state(
         image_path = tool_response["image_path"]
         tool_context.state["current_image_path"] = image_path
         filename = pathlib.Path(image_path).name
-        # current_image_display_url ALWAYS uses the browser-loadable /outputs route proxied by Next.js
-        tool_context.state["current_image_display_url"] = f"{BACKEND_PUBLIC_ORIGIN}/outputs/{filename}"
+        # Browser-loadable relative path proxied by Next.js (/outputs/{filename})
+        tool_context.state["current_image_display_url"] = f"/outputs/{filename}"
+        tool_context.state["current_image_filename"] = filename
         if tool_response.get("image_url") and not tool_response.get("dry_run"):
             tool_context.state["current_image_url"] = tool_response["image_url"]
         else:
@@ -305,6 +306,37 @@ def _catch_image_placeholder(
     )
 
 
+def _sanitize_draft_response(
+    callback_context: CallbackContext, llm_response: LlmResponse
+) -> Optional[LlmResponse]:
+    """Sanitizes draft_agent text output so that raw local filesystem paths (/Users/...)
+    and raw signed cloud storage URLs with sensitive HMAC signature keys NEVER leak
+    into the agent activity drawer or post text."""
+    if not llm_response.content or not llm_response.content.parts:
+        return None
+    modified = False
+    new_parts = []
+    for part in llm_response.content.parts:
+        if not part.text:
+            new_parts.append(part)
+            continue
+        text = part.text
+        # Strip raw filesystem paths and long signed storage URLs from sub-agent output
+        cleaned = re.sub(
+            r"(?m)^\s*(?:Image(?:\s+URL|\s+Path)?\s*:\s*)?(?:/Users/|[A-Za-z]:[\\/]|gs://|https://storage\.googleapis\.com/).*$\n?",
+            "",
+            text,
+        ).rstrip()
+        if cleaned != text:
+            modified = True
+            new_parts.append(genai_types.Part.from_text(text=cleaned))
+        else:
+            new_parts.append(part)
+    if modified:
+        return LlmResponse(content=genai_types.Content(role="model", parts=new_parts))
+    return None
+
+
 draft_agent = Agent(
     name="draft_agent",
     model=guardrails.model(DRAFT_MODEL),
@@ -330,9 +362,11 @@ Rules:
    - When the user asks for an illustration, image, graphic, or visual (e.g. "with an illustration", "add an image", "illustrate it"): YOU MUST CALL generate_image. Load the poster-style skill first, formulate a vivid, creative visual prompt describing a recognizable editorial scene or metaphor, and ACTUALLY CALL generate_image. Never omit it, and never write a placeholder like "(Image: ...)" instead of calling the tool.{_GCS_UPLOAD_STEP}
    - If the user gives you a URL to an image (pasted a link, said "use this image: <url>", etc.) rather than asking you to generate one, call use_provided_image_url with that exact URL and use it as-is. Never call generate_image or upload_image for it — it's already hosted.
    - Otherwise, if an image already exists above for this same post, REUSE it — report that same path/URL, do not call generate_image again.
-4. Return ONLY the draft text (with no image caption or placeholder in it)
-   and the image path/URL if any — no commentary about approvals or posting;
-   the orchestrator handles that.""",
+4. Return ONLY the clean draft text (including title, body, and hashtags).
+   If an image was generated, append on a final line: `[IMAGE: /outputs/<filename>]`
+   (e.g. `[IMAGE: /outputs/post-image-123.png]`).
+   NEVER output raw filesystem paths (/Users/...), and NEVER output signed storage URLs
+   or authentication keys. No commentary about approvals or posting; the orchestrator handles that.""",
     tools=[
         skill_toolset,
         generate_image,
@@ -342,7 +376,11 @@ Rules:
     ],
     output_key="current_draft",
     generate_content_config=guardrails.content_config(screen_input=False),
-    after_model_callback=[guardrails.friendly_block, _catch_image_placeholder],
+    after_model_callback=[
+        guardrails.friendly_block,
+        _catch_image_placeholder,
+        _sanitize_draft_response,
+    ],
     after_tool_callback=_track_image_state,
 )
 
@@ -719,6 +757,76 @@ publish now rather than schedule.{_BUFFER_CHANNEL_LOOKUP}{_BUFFER_IMAGE_NOTE}
 else:
     _BUFFER_ROUTING = ""
 
+def _sanitize_and_fix_image_markdown(
+    callback_context: CallbackContext, llm_response: LlmResponse
+) -> Optional[LlmResponse]:
+    """Ensures that the orchestrator's response cleanly embeds the generated image
+    using the browser-loadable /outputs/<filename> route, never leaks raw signed GCS URLs
+    or local filesystem paths to the user, and never leaves broken empty ![post image]() tags."""
+    if not llm_response.content or not llm_response.content.parts:
+        return None
+    display_url = callback_context.state.get("current_image_display_url")
+    if not display_url and callback_context.state.get("current_image_path"):
+        fname = pathlib.Path(callback_context.state["current_image_path"]).name
+        display_url = f"/outputs/{fname}"
+        callback_context.state["current_image_display_url"] = display_url
+
+    modified = False
+    new_parts = []
+    for part in llm_response.content.parts:
+        if not part.text:
+            new_parts.append(part)
+            continue
+        text = part.text
+
+        # 1. Sanitize raw filesystem paths and long signed Cloud Storage URLs from user-facing text
+        text = re.sub(
+            r"(?m)^\s*(?:Image(?:\s+URL|\s+Path)?\s*:\s*)?(?:/Users/|[A-Za-z]:[\\/]|gs://|https://storage\.googleapis\.com/).*$\n?",
+            "",
+            text,
+        )
+
+        # 2. Fix empty or missing image markdown
+        if re.search(r"!\[(?:post image|image)?\]\(\s*\)", text):
+            if display_url:
+                text = re.sub(
+                    r"!\[(?:post image|image)?\]\(\s*\)",
+                    f"![post image]({display_url})",
+                    text,
+                )
+            else:
+                # No image exists — eliminate the empty tag completely so it doesn't crash Next.js
+                text = re.sub(r"!\[(?:post image|image)?\]\(\s*\)\n?", "", text)
+            modified = True
+        elif display_url and "![post image]" not in text and "[IMAGE:" not in text:
+            # If an image exists, ensure it is rendered right before the approval question
+            pattern = r"((?:Do you approve|Looks good\?|Would you like to approve|Should I post|What do you think).*)"
+            if re.search(pattern, text, re.IGNORECASE):
+                text = re.sub(
+                    pattern,
+                    f"![post image]({display_url})\n\n\\1",
+                    text,
+                    count=1,
+                    flags=re.IGNORECASE,
+                )
+                modified = True
+
+        # 3. Convert any [IMAGE: /outputs/...] tag into markdown
+        if "[IMAGE:" in text:
+            text = re.sub(r"\[IMAGE:\s*([^\]]+)\]", r"![post image](\1)", text)
+            modified = True
+
+        if text != part.text:
+            modified = True
+            new_parts.append(genai_types.Part.from_text(text=text))
+        else:
+            new_parts.append(part)
+
+    if modified:
+        return LlmResponse(content=genai_types.Content(role="model", parts=new_parts))
+    return None
+
+
 root_agent = Agent(
     name="social_poster",
     model=guardrails.model(ORCHESTRATOR_MODEL),
@@ -754,11 +862,12 @@ Workflow:{_MEMORY_ROUTING}
    for an illustration or image (e.g. "with an illustration", "add an image", "illustrate it"),
    explicitly instruct draft_agent: "Include an illustration by calling generate_image."
 3. Show the finished draft to the user and ask for approval:
-   - If an image was generated (i.e. {{current_image_display_url?}} is NOT blank/empty),
-     embed it as Markdown on its own line right after the draft text and hashtags,
-     using EXACTLY this pre-resolved URL: `![post image]({{current_image_display_url?}})`.
-   - CRITICAL: If {{current_image_display_url?}} is blank or empty, NO image exists yet.
-     NEVER output `![post image]()` and NEVER output any image markdown with an empty src.
+   - If an image was generated, embed it as Markdown on its own line right after the draft
+     text and hashtags using the browser-loadable outputs path: `![post image](/outputs/<filename>)`
+     (or `![post image]({{current_image_display_url?}})`).
+   - NEVER output an empty image tag like `![post image]()`. If no image was generated,
+     do NOT output any image markdown.
+   - Do NOT output raw local filesystem paths (/Users/...) or long signed storage URLs in the chat.
    - If the user requested an image but none exists yet, or if the user asks
      "where's the image?", "add an image", or "illustrate it", call generate_image
      immediately to produce the illustration before presenting or finalizing the draft.
@@ -804,7 +913,10 @@ Posting rules (strict):
     before_agent_callback=_init_stage,
     generate_content_config=guardrails.content_config(),
     before_model_callback=[_stage_attached_image],
-    after_model_callback=guardrails.friendly_block,
+    after_model_callback=[
+        guardrails.friendly_block,
+        _sanitize_and_fix_image_markdown,
+    ],
     before_tool_callback=[_delay_buffer_post, guardrails.redact_before_post],
     after_tool_callback=_track_stage,
     after_agent_callback=_stage_after_agent,
