@@ -46,3 +46,10 @@ def test_track_stage_before_tool():
     _track_stage_before_tool(FakeTool("draft_agent"), {}, ctx)
     assert ctx.state["pipeline_stage"] == "drafting"
 
+def test_buffer_auto_populates_channel_id():
+    args = {"text": "Testing missing channelId"}
+    ctx = FakeContext(state={"buffer_channel_id": "test_chan_123"})
+    _delay_buffer_post(FakeTool("create_post"), args, ctx)
+    assert args.get("channelId") == "test_chan_123"
+
+

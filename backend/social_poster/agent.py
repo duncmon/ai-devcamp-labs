@@ -537,10 +537,14 @@ BUFFER_REVIEW_DELAY_MINUTES = int(os.environ.get("BUFFER_REVIEW_DELAY_MINUTES", 
 def _delay_buffer_post(
     tool: BaseTool, args: dict[str, Any], tool_context: ToolContext
 ) -> Optional[dict]:
-    if (
-        tool.name == "create_post"
-        and args.get("channelId")  # Buffer-only field; LinkedIn's local server has none
-    ):
+    if tool.name == "create_post":
+        # Ensure channelId is populated to prevent premature failed calls
+        if not args.get("channelId") and tool_context:
+            cached_channel = tool_context.state.get("buffer_channel_id")
+            if cached_channel:
+                args["channelId"] = cached_channel
+                log.info("Auto-populated channelId for Buffer create_post: %s", cached_channel)
+
         args.setdefault("schedulingType", "automatic")
         now = datetime.datetime.now(datetime.timezone.utc)
         min_due = now + datetime.timedelta(minutes=BUFFER_REVIEW_DELAY_MINUTES)
@@ -642,6 +646,12 @@ def _track_stage(
 ) -> Optional[dict]:
     if tool.name == "generate_image":
         _track_image_state(tool, args, tool_context, tool_response)
+    elif tool.name == "list_channels":
+        parsed = _unwrap_mcp_result(tool_response)
+        channels = parsed if isinstance(parsed, list) else parsed.get("channels") if isinstance(parsed, dict) else None
+        if channels and isinstance(channels, list) and isinstance(channels[0], dict) and channels[0].get("id"):
+            tool_context.state["buffer_channel_id"] = str(channels[0]["id"])
+            log.info("Cached primary buffer_channel_id in session state: %s", tool_context.state["buffer_channel_id"])
     if tool.name in _TOOL_STAGES:
         tool_context.state["pipeline_stage"] = _TOOL_STAGES[tool.name]
     elif tool.name in ("create_post", "linkedin_create_post") and tool_response.get("isError") is False:
@@ -752,7 +762,9 @@ _IMAGE_REUSE_NOTE = (
 # when almost every attendee's Buffer account has exactly one organization
 # and one channel per platform.
 _BUFFER_CHANNEL_LOOKUP = """
-  To find a Buffer channelId, resolve it yourself, don't ask the user:
+  MANDATORY BUFFER CHANNEL PRE-REQUISITE:
+  Buffer's create_post REQUIRES a valid channelId. Calling create_post without channelId will fail immediately.
+  BEFORE calling create_post, you MUST resolve the channelId yourself:
     1. Call get_account (no arguments). Read organizations[0].id — almost
        every account has exactly one organization; only ask the user if
        there is genuinely more than one.
@@ -760,10 +772,8 @@ _BUFFER_CHANNEL_LOOKUP = """
        platform (linkedin, twitter for X, facebook, instagram, ...), match
        the channel whose "service" matches. If the user simply asked to post
        via Buffer or didn't specify a service, select the first available channel.
-    3. If exactly one channel matches, use its id as channelId directly — do
-       not ask the user which account, and never ask for an organization name;
-       you already have it from steps 1 and 2. Only ask the user to pick if more
-       than one channel matches the same requested service."""
+    3. Pass that channel's id as channelId in create_post. NEVER call create_post
+       before obtaining the channelId via list_channels."""
 
 if use_linkedin and use_buffer:
     _BUFFER_ROUTING = f"""
@@ -925,6 +935,8 @@ Posting rules (strict):
 - Only post AFTER the user has explicitly approved the exact draft shown to
   them in this conversation. "Yes", "post it", "approved" counts; silence,
   topic changes, or enthusiasm about the idea does not.
+- When posting via Buffer, you MUST call get_account and list_channels to retrieve
+  the channelId BEFORE invoking create_post. Never call create_post without channelId.
 - If the draft changes after approval, show it again and get fresh approval.
 - After posting, check the tool result's own "status" and "dueAt" fields
   before telling the user what happened — confirmed live: Buffer's
