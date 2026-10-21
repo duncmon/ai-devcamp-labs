@@ -847,6 +847,126 @@ node_modules/
       </div>
     </article>
 
+    <article class="step-card" id="issue-model-armor-location">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 24 · Govern</span>
+          <h2 class="step-title">Model Armor Regional Invariance, Deliberate Error 1 &amp; The Location Mismatch 400 Cascade</h2>
+        </div>
+        <span class="badge red">Guardrail Failure</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> Symptom &amp; Root Cause</div>
+          <p>
+            During Cloud Agent Engine end-to-end testing (captured in video <code>Enregistrement de l’écran 2026-10-21 à 14.35.53.mov</code> and Cloud Console Playground logs), attendee queries triggered an abrupt client crash:
+          </p>
+          <pre><code>[CopilotKit] Agent error: "Execution timed out"</code></pre>
+          <p>
+            Cloud Console container execution logs revealed repeated exceptions:
+          </p>
+          <pre><code>ClientError: 400 INVALID_ARGUMENT. The template named 'projects/ai-devcamp-duncan-395792/locations/us-central1/templates/devcamp-guardrails' was not found (reason: TEMPLATE_NOT_FOUND, domain: modelarmor.googleapis.com)</code></pre>
+          <p>
+            Forensic analysis of the Lab 3 curriculum and Vertex AI security runtime uncovered four root causes:
+          </p>
+          <ul>
+            <li><strong>Model Armor Regional Invariance:</strong> Unlike global LLM endpoints, Model Armor templates are strictly regional resources (e.g. <code>locations/us-central1</code>). They cannot be created on or queried from <code>locations/global</code>.</li>
+            <li><strong>Lab 3 Deliberate Error 1 ("Gemini on the global location"):</strong> As documented in the official Lab 3 curriculum (<code>docs/lab-3-govern.html</code>, Step 2), Vertex AI inline Model Armor screening (<code>GenerateContentConfig.model_armor_config</code>) requires the Gemini API call and the Model Armor template to share the identical regional location (<code>us-central1</code>). When Gemini calls default to <code>global</code>, Vertex AI instantly rejects the request with <code>400 TEMPLATE_NOT_FOUND</code>.</li>
+            <li><strong>The Deployment Environment Default Anti-Pattern:</strong> When deploying via <code>agents-cli deploy</code> without explicit location environment overrides, the container runtime injects <code>GOOGLE_CLOUD_LOCATION=global</code> by default.</li>
+            <li><strong>The Retry Timeout Trap:</strong> In <code>backend/social_poster/guardrails.py</code>, <code>RETRY_CONFIG</code> included HTTP status code <code>400</code> (intended to absorb transient template lookup glitches). Because the location mismatch was deterministic, ADK retried the rejected call 6 times with exponential delays (1.5s, 3s, 6s, 12s, 24s, 32s = ~78s total). This latency exceeded CopilotKit's client timeout, causing the UI to crash with <code>Execution timed out</code>.</li>
+            <li><strong>DLP Project Number vs. String ID:</strong> In Agent Runtime, <code>GOOGLE_CLOUD_PROJECT</code> defaults to the numeric project number (<code>498585195540</code>). Cloud DLP and Model Armor template resource names strictly require the alphanumeric project ID (<code>ai-devcamp-duncan-395792</code>), failing with <code>Malformed parent field</code> if the number is passed.</li>
+          </ul>
+          <p>
+            <strong>The Enterprise Solution:</strong>
+          </p>
+          <ul>
+            <li><strong>Defensive Self-Healing Override in <code>guardrails.py</code>:</strong> Added runtime guardrail initialization logic: whenever <code>MA_TEMPLATE</code> is active and <code>GOOGLE_CLOUD_LOCATION</code> is <code>global</code> or unset, automatically log a warning and override <code>os.environ["GOOGLE_CLOUD_LOCATION"] = MA_REGION</code> (<code>us-central1</code>) and <code>os.environ["VERTEX_LOCATION"] = MA_REGION</code>.</li>
+            <li><strong>Resilient Project ID Resolution Hierarchy:</strong> In <code>guardrails.py</code>, if <code>DLP_PROJECT</code> is purely digits or missing, automatically fall back to Application Default Credentials (<code>google.auth.default()</code>) to extract the canonical project ID string.</li>
+            <li><strong>Explicit Regional Deployment Flags:</strong> Executed <code>agents-cli deploy</code> passing explicit environment bindings: <code>GOOGLE_CLOUD_LOCATION=us-central1,MODEL_ARMOR_REGION=us-central1,MODEL_ARMOR_TEMPLATE_ID=devcamp-guardrails,PROJECT_ID=ai-devcamp-duncan-395792</code>.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-regional-vs-multiregion">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 25 · Architecture</span>
+          <h2 class="step-title">Regional (<code>us-central1</code>) vs. Multi-Regional (<code>us</code>) Analysis &amp; The Inverted Model Availability Paradox</h2>
+        </div>
+        <span class="badge blue">Architectural Decision</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">⚖️</span> Architectural Dilemma &amp; Live Empirical Probing</div>
+          <p>
+            Given that Model Armor templates are mandatory in Lab 3 to provide a deterministic, auditable refusal contract (and to pass the automated <code>evals/governance.json</code> gate), a natural architectural question arises: <em>Why not switch the agent's endpoint to multi-region <code>us</code> to access newer Gemini models while preserving Model Armor template support?</em>
+          </p>
+          <p>
+            To evaluate this, we conducted direct live API probes across Vertex AI locations (<code>us-central1</code>, <code>us</code>, and <code>global</code>), uncovering the <strong>Inverted Model Availability Paradox</strong>:
+          </p>
+          <div class="tbl-wrap">
+            <table class="test-scenario-table">
+              <thead>
+                <tr>
+                  <th>Model ID</th>
+                  <th><code>us-central1</code> (Regional)</th>
+                  <th><code>us</code> (Multi-Regional)</th>
+                  <th><code>global</code> (Global Endpoint)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>gemini-2.5-flash</code></td>
+                  <td><strong>200 OK</strong></td>
+                  <td><span style="color: var(--red); font-weight: 700;">404 NOT_FOUND</span></td>
+                  <td><strong>200 OK</strong></td>
+                </tr>
+                <tr>
+                  <td><code>gemini-2.5-flash-lite</code></td>
+                  <td><strong>200 OK</strong></td>
+                  <td><span style="color: var(--red); font-weight: 700;">404 NOT_FOUND</span></td>
+                  <td><strong>200 OK</strong></td>
+                </tr>
+                <tr>
+                  <td><code>gemini-3.5-flash</code></td>
+                  <td><span style="color: var(--red); font-weight: 700;">404 NOT_FOUND</span></td>
+                  <td><strong>200 OK</strong></td>
+                  <td><strong>200 OK</strong></td>
+                </tr>
+                <tr>
+                  <td><code>gemini-3.8-flash</code></td>
+                  <td><span style="color: var(--red); font-weight: 700;">404 NOT_FOUND</span></td>
+                  <td><strong>200 OK</strong></td>
+                  <td><strong>429 Quota / 200 OK</strong></td>
+                </tr>
+                <tr>
+                  <td><strong>Model Armor Support</strong></td>
+                  <td><strong>Full Support</strong></td>
+                  <td><strong>Full Support</strong></td>
+                  <td><span style="color: var(--red); font-weight: 700;">BROKEN (400 TEMPLATE_NOT_FOUND)</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            <strong>Why Multi-Region (<code>us</code>) Breaks Other Aspects of the Labs:</strong>
+          </p>
+          <ul>
+            <li><strong>The Fallback Safety Net Destruction:</strong> In <code>us</code> multi-region, <code>gemini-2.5-flash</code> and <code>gemini-2.5-flash-lite</code> return <code>404 NOT_FOUND</code>. If transient 429 quota exhaustion or model degradation strikes 3.5/3.8, the agent's <code>FallbackGemini</code> cascade cannot fall back to 2.5 GA models, permanently failing the turn.</li>
+            <li><strong>Vertex AI Agent Runtime Incompatibility:</strong> Reasoning Engines are strictly <strong>regional resources</strong> (deployed in <code>us-central1</code>). There is no multi-region compute target for Agent Runtime.</li>
+            <li><strong>Agent Gateway Incompatibility (Lab 3 Step 7):</strong> Network Services Agent Gateway and Service Extensions Authorization Policies must reside in the exact same region as the Reasoning Engine (<code>us-central1</code>). An extension in <code>us-central1</code> cannot bind to a multi-region template in <code>us</code> without cross-location routing failures.</li>
+            <li><strong>Governance Policy Engine Region-Gating (Lab 3 Step 6):</strong> Google's supported locations list for the Semantic Governance Policy Engine includes <code>us-central1</code>, <code>us-east1</code>, and <code>europe-west1</code>. Multi-region <code>us</code> is unsupported; provisioning fails with <code>FAILED_PRECONDITION</code>.</li>
+            <li><strong>Lab 4 Model Right-Sizing Failure:</strong> Lab 4 Step 4 benchmarks token cost reductions by shifting the Research Agent to <code>gemini-2.5-flash-lite</code> ($0.10 input / $0.40 output). In <code>us</code> multi-region, <code>flash-lite</code> returns 404, preventing attendees from executing the cost-optimization exercises.</li>
+            <li><strong>Cost Consequences:</strong> Running in <code>us-central1</code> allows leveraging Flash-Lite to slash token spend by 66% on inputs and 84% on outputs with zero cross-region egress fees. Multi-region <code>us</code> forces reliance on 3.5/3.8 tiers (3×–5× higher input costs) and adds cross-region network egress charges ($0.01/GB).</li>
+          </ul>
+          <p>
+            <strong>Decision:</strong> Maintain single-region <code>us-central1</code> co-location as the primary enterprise architecture, utilizing <code>FallbackGemini</code> for resilient multi-model routing.
+          </p>
+        </div>
+      </div>
+    </article>
+
     <!-- Footer -->
     <footer>
       <div><a href="index.html">← Back to Overview</a> | <a href="lab-3.html">View Lab 3 Walkthrough →</a></div>
