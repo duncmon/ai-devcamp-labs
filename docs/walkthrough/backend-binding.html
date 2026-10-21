@@ -479,13 +479,27 @@ export async function GET() {
   const noCacheHeaders = { "cache-control": "no-store, no-cache, must-revalidate" };
 
   try {
-    const probeRes = await backendFetch("/healthz", { signal: AbortSignal.timeout(2500) });
-    if (probeRes.ok) {
+    // Universal probe: /openapi.json works on local FastAPI AND Cloud Vertex AI Agent Runtime
+    // (/healthz is reserved/blocked by the Cloud Agent Engine gateway). Defensively fallback to /api/posts.
+    let probeRes = await backendFetch("/openapi.json", {
+      signal: AbortSignal.timeout(4000),
+    }).catch(() => null);
+
+    if (!probeRes || !probeRes.ok) {
+      probeRes = await backendFetch("/api/posts", {
+        signal: AbortSignal.timeout(2000),
+      }).catch(() => null);
+    }
+
+    if (probeRes && probeRes.ok) {
       return NextResponse.json({ origin, isLocal, healthy: true }, { headers: noCacheHeaders });
     }
-    return NextResponse.json({ origin, isLocal, healthy: false, status: probeRes.status, error: `HTTP ${probeRes.status}` }, { headers: noCacheHeaders });
+    return NextResponse.json(
+      { origin, isLocal, healthy: false, status: probeRes ? probeRes.status : 503, error: probeRes ? `HTTP ${probeRes.status}` : "Endpoint unreachable" },
+      { headers: noCacheHeaders }
+    );
   } catch (err: any) {
-    const error = err?.name === "TimeoutError" ? "Health check timed out (2500ms)" : (err?.message ?? "Connection failed");
+    const error = err?.name === "TimeoutError" ? "Health check timed out (4000ms)" : (err?.message ?? "Connection failed");
     return NextResponse.json({ origin, isLocal, healthy: false, error }, { headers: noCacheHeaders });
   }
 }</code></pre>
@@ -735,6 +749,39 @@ $ curl -s http://localhost:3000/api/backend-status | jq .
             <strong>The Solution:</strong> We integrated the official <code>google-auth-library</code>. Its internal <code>auth.getClient().getAccessToken()</code> automatically manages token caching, expiry tracking, and background renewal. Probes remain lightning fast (sub-millisecond when cached) while guaranteeing fresh authentication credentials across long-running sessions.
           </p>
         </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> 5. The Vertex AI Agent Runtime Health Probe 404 Paradox (/healthz vs /openapi.json)</div>
+          <p>
+            <strong>The Problem:</strong> During empirical testing of <code>./run-frontend.sh --cloud</code>, an intriguing paradox emerged: the frontend header displayed <code>⚠ Unreachable</code> in red, yet chat prompts were drafted flawlessly by the cloud multi-agent system (as verified in Cloud Console session <code>151756415931777024</code>). Deep-probing the Reasoning Engine reverse proxy revealed that requesting <code>.../reasoningEngines/&lt;id&gt;/api/healthz</code> returned <code>HTTP 404 NOT_FOUND</code> with <code>"Reasoning Engine Execution failed"</code>. Vertex AI's managed gateway reserves or filters root <code>/healthz</code> at the Kubernetes ingress layer, preventing the call from reaching FastAPI.
+          </p>
+          <p>
+            <strong>The Solution:</strong> We shifted the primary health probe in <code>frontend/app/api/backend-status/route.ts</code> to <code>/openapi.json</code> (with defensive fallback to <code>/api/posts</code>) and extended the timeout to 4000ms to absorb serverless container cold-starts. Because FastAPI automatically mounts <code>/openapi.json</code> at the root on both local Uvicorn and cloud Agent Runtime, probing returns <code>HTTP 200 OK</code> universally, turning the indicator into a crisp blue <code>☁ Vertex AI (us-central1:1836…)</code> badge.
+          </p>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🎨</span> 6. Model Churn &amp; Cloud Fallback Failure (gemini-3.1-flash-image vs gemini-2.5-flash-image)</div>
+          <p>
+            <strong>The Problem:</strong> During the cloud test run, the assistant outputted: <em>"I was unable to generate an image for your post due to a technical error."</em> Cloud Console Playground container logs confirmed that <code>draft_agent</code> triggered the <code>generate_image</code> tool. In <code>backend/social_poster/tools.py</code>, the model was fetched via <code>os.environ.get("IMAGE_MODEL_ID", "gemini-3.1-flash-image")</code>. Because the Reasoning Engine container ran without <code>IMAGE_MODEL_ID</code> passed in its container deployment environment, it fell back to <code>gemini-3.1-flash-image</code>. In <code>us-central1</code>, Vertex AI returned <code>404 NOT_FOUND: Publisher model ... gemini-3.1-flash-image was not found</code>.
+          </p>
+          <p>
+            <strong>The Solution:</strong> We pinned the code default in <code>backend/social_poster/tools.py</code> to <code>gemini-2.5-flash-image</code>, matching the working definition in <code>.env</code>. Testing with <code>uv run python</code> confirmed that Vertex AI successfully returns <code>HTTP 200 OK</code> and writes high-resolution PNG assets to the gallery.
+          </p>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🧬</span> 7. ADK Version Evolution &amp; Streaming Protocol Contract (google-adk 2.4.0 / ag-ui-adk 0.7.0)</div>
+          <p>
+            <strong>The Architectural Lesson:</strong> Analyzing the dependency baseline across <code>google-adk 2.4.0</code> and <code>ag-ui-adk 0.7.0</code> revealed four critical design principles governing modern agentic architectures:
+          </p>
+          <ul>
+            <li><strong>Graceful Tool Error Handling:</strong> In ADK 2.x, function tools returning error dictionaries (e.g., <code>{"status": "error", "error": "..."}</code>) do not crash the agent process. Instead, ADK marshals the dictionary into a standard <code>FunctionResponse</code> observation. The LLM consumes this observation and responds gracefully to the user, preventing unhandled runtime exceptions.</li>
+            <li><strong>SSE Keep-Alive Heartbeats:</strong> In <code>ag-ui-adk 0.7.0</code>, <code>EventSourceResponse</code> automatically injects 15-second <code>: ping</code> comments into the event stream. This prevents Cloud Run, Google Cloud API Gateway, and Node <code>undici</code> client sockets from severing idle connections during extensive multi-agent tool execution waterfalls.</li>
+            <li><strong>Model Armor Non-Streaming Requirement:</strong> As documented in <code>backend/main.py</code>, Model Armor inline content screening requires <code>StreamingMode.NONE</code> in ADK 2.4.0. Token-by-token SSE streaming bypasses synchronous content inspection; hence, governed agents must emit whole responses.</li>
+            <li><strong>Managed Session Lifecycles:</strong> On Vertex AI Agent Engine, setting <code>delete_session_on_cleanup = False</code> prevents <code>ag-ui-adk</code>'s 20-minute local idle reaper from deleting persistent sessions from the cloud managed store.</li>
+          </ul>
+        </div>
       </div>
     </article>
 
@@ -789,6 +836,62 @@ $ curl -s http://localhost:3000/api/backend-status | jq .
           <img src="../screenshots/step8-teardown.png" alt="GCP Teardown Confirmation" loading="lazy">
           <figcaption>
             <strong>Figure 5 — Lab 2 GCP Resource Teardown:</strong> CLI confirmation of <code>gcloud run services delete</code> and Reasoning Engine deletion during Lab 2 Step 9. This teardown created the dormant cloud URL that caused the subsequent Lab 1 Step 8 drift.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 6 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab1-step8-local-run-draft.png" alt="Local Run Post Draft with Green Badge" loading="lazy">
+          <figcaption>
+            <strong>Figure 6 — Local Profile Execution &amp; Green Status Badge:</strong> Running under <code>./run-frontend.sh --local</code>, the dashboard displays <code>● Local (:8000)</code> in green. The attendee prompt (<em>"prepare me a post for linkedin on today's weather in England"</em>) is decomposed into research and drafting subtasks, generating a structured weather update with authentic emojis. Per Rule 3 in <code>agent.py</code>, image generation is skipped because the user did not explicitly request an image.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 7 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab1-step8-local-run-approval.png" alt="Local HITL Approval Modal" loading="lazy">
+          <figcaption>
+            <strong>Figure 7 — Human-in-the-Loop (HITL) Interactive Approval Dialog:</strong> CopilotKit presents the confirmation dialog containing the post preview, publication platform (LinkedIn), and clear <code>Approve</code> and <code>Reject</code> action buttons, enforcing human verification prior to API mutation.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 8 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab1-step8-local-run-full.png" alt="Local Dry Run Complete & Gallery Sync" loading="lazy">
+          <figcaption>
+            <strong>Figure 8 — Local Runthrough Completion &amp; Gallery Sync:</strong> Upon clicking <code>Approve</code>, the orchestrator invokes <code>create_post</code> in <code>DRY_RUN</code> mode. The chat confirms publication status, and the right-hand gallery dynamically updates with persistent post metadata from SQLite.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 9 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab1-step8-cloud-frontend-terminal.png" alt="Cloud Launch Profile Terminal" loading="lazy">
+          <figcaption>
+            <strong>Figure 9 — Cloud Launch Profile (run-frontend.sh --cloud):</strong> Terminal output confirming Twelve-Factor Principle 3 in action. The launcher reads <code>deployment_metadata.json</code>, extracts Reasoning Engine <code>1836136314752204800</code>, and exports <code>ADK_BACKEND_ORIGIN</code> targeting the us-central1 Vertex AI reverse proxy.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 10 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab1-step8-cloud-run-draft.png" alt="Cloud Run Execution and Image Resolution Error" loading="lazy">
+          <figcaption>
+            <strong>Figure 10 — Cloud Execution &amp; The Red Badge Paradox:</strong> In cloud mode, the header initially displayed <code>⚠ Unreachable</code> in red due to the <code>/healthz</code> routing discrepancy. Despite this indicator, the cloud Reasoning Engine generated the post. The message ends with <em>"I was unable to generate an image for your post due to a technical error."</em>, revealing the <code>gemini-3.1-flash-image</code> model resolution defect.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 11 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab1-step8-cloud-console-sessions.png" alt="Vertex AI Agent Platform Sessions Console" loading="lazy">
+          <figcaption>
+            <strong>Figure 11 — Google Cloud Console Agent Platform Sessions:</strong> Cloud Console Sessions tab confirming that session <code>151756415931777024</code> was created live on Vertex AI Agent Engine for <code>social_poster</code>, proving that the Next.js frontend successfully communicated with the cloud backend via ADC authentication.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 12 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab1-step8-cloud-console-playground.png" alt="Cloud Console Playground Container Logs" loading="lazy">
+          <figcaption>
+            <strong>Figure 12 — Cloud Console Playground Container Execution Traces:</strong> Server-side logs from the Reasoning Engine container verifying incoming traffic: <code>POST /api/adk HTTP/1.1 200 OK</code>. Subsequent logs detail the tool invocations for <code>research_agent</code> and <code>draft_agent</code>, validating seamless cloud agent orchestration.
           </figcaption>
         </figure>
       </div>
