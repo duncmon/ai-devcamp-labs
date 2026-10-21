@@ -91,7 +91,7 @@ def generate_image(prompt: str) -> dict:
                     if os.environ.get("GCS_BUCKET_NAME"):
                         try:
                             upload_res = upload_image(str(path))
-                            if upload_res.get("status") == "success" and upload_res.get("url"):
+                            if upload_res.get("status") == "success" and upload_res.get("url") and not upload_res.get("dry_run"):
                                 result["image_url"] = upload_res["url"]
                                 log.info("generate_image: auto-persisted to GCS -> %s", upload_res["url"])
                         except Exception as upload_err:
@@ -204,34 +204,33 @@ def upload_image(image_path: str) -> dict:
         dict with 'status', and on success 'url' (a signed or plain HTTPS
         URL, depending on GCS_PUBLIC_BUCKET) or on failure an 'error' message.
     """
-    if os.environ.get("DRY_RUN", "true").lower() != "false":
-        return {
-            "status": "success",
-            "dry_run": True,
-            "url": f"https://storage.googleapis.com/dry-run-bucket/{uuid.uuid4().hex[:12]}.png",
-            "note": "DRY_RUN=true, nothing was uploaded.",
-        }
-
     bucket_name = os.environ.get("GCS_BUCKET_NAME", "")
     if not bucket_name:
+        if os.environ.get("DRY_RUN", "true").lower() != "false":
+            return {
+                "status": "success",
+                "dry_run": True,
+                "url": f"https://storage.googleapis.com/dry-run-bucket/{uuid.uuid4().hex[:12]}.png",
+                "note": "DRY_RUN=true, GCS_BUCKET_NAME not set.",
+            }
         return {"status": "error", "error": "GCS_BUCKET_NAME is not set."}
 
     public_bucket = os.environ.get("GCS_PUBLIC_BUCKET", "false").lower() == "true"
-    if not public_bucket and not os.environ.get("GCS_SIGNING_SERVICE_ACCOUNT", ""):
-        return {"status": "error", "error": "GCS_SIGNING_SERVICE_ACCOUNT is not set."}
-
     try:
         ext = pathlib.Path(image_path).suffix or ".png"
         blob_name = f"post-images/{int(time.time())}-{uuid.uuid4().hex[:8]}{ext}"
         bucket = storage.Client().bucket(bucket_name)
         bucket.blob(blob_name).upload_from_filename(image_path)
         if public_bucket:
-            # Plain object URL — only fetchable if the bucket is actually
-            # public (gcp-setup.sh with GCS_PUBLIC_BUCKET=true). No signing,
-            # no impersonation, no expiry.
             url = f"https://storage.googleapis.com/{bucket_name}/{blob_name}"
+        elif os.environ.get("GCS_SIGNING_SERVICE_ACCOUNT"):
+            try:
+                url = _sign_via_impersonation(bucket_name, blob_name)
+            except Exception as sign_err:
+                log.warning("Signing via impersonation failed (%s), using direct storage URL", sign_err)
+                url = f"https://storage.googleapis.com/{bucket_name}/{blob_name}"
         else:
-            url = _sign_via_impersonation(bucket_name, blob_name)
+            url = f"https://storage.googleapis.com/{bucket_name}/{blob_name}"
     except Exception as e:  # surface API errors to the model as a tool result
         return {"status": "error", "error": str(e)}
 

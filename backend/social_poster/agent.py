@@ -168,16 +168,11 @@ def _track_image_state(
         image_path = tool_response["image_path"]
         tool_context.state["current_image_path"] = image_path
         filename = pathlib.Path(image_path).name
-        # If generate_image returned an image_url (e.g. auto-persisted to GCS), use it for display
-        if tool_response.get("image_url"):
-            tool_context.state["current_image_display_url"] = tool_response["image_url"]
+        # current_image_display_url ALWAYS uses the browser-loadable /outputs route proxied by Next.js
+        tool_context.state["current_image_display_url"] = f"{BACKEND_PUBLIC_ORIGIN}/outputs/{filename}"
+        if tool_response.get("image_url") and not tool_response.get("dry_run"):
             tool_context.state["current_image_url"] = tool_response["image_url"]
         else:
-            tool_context.state["current_image_display_url"] = f"{BACKEND_PUBLIC_ORIGIN}/outputs/{filename}"
-            # ADK's State has no pop()/del — only __setitem__/get/update. Every
-            # reader here treats None the same as absent (inject_session_state's
-            # {{...?}} template and the plain .get() calls below both do), so
-            # clearing to None is the correct way to unset a state key.
             tool_context.state["current_image_url"] = None  # belonged to the old image
     elif (
         tool.name == "upload_image"
