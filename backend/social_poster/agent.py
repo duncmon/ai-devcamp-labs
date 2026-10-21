@@ -500,14 +500,33 @@ def _delay_buffer_post(
         and args.get("channelId")  # Buffer-only field; LinkedIn's local server has none
     ):
         args.setdefault("schedulingType", "automatic")
-        if BUFFER_REVIEW_DELAY_MINUTES > 0:
-            due = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
-                minutes=BUFFER_REVIEW_DELAY_MINUTES
-            )
+        now = datetime.datetime.now(datetime.timezone.utc)
+        min_due = now + datetime.timedelta(minutes=BUFFER_REVIEW_DELAY_MINUTES)
+
+        # Check if an intentional future dueAt was already specified
+        existing_due_str = args.get("dueAt")
+        existing_due = None
+        if existing_due_str:
+            try:
+                # Handle ISO 8601 string parsing defensively
+                existing_due = datetime.datetime.fromisoformat(
+                    str(existing_due_str).replace("Z", "+00:00")
+                )
+                if existing_due.tzinfo is None:
+                    existing_due = existing_due.replace(tzinfo=datetime.timezone.utc)
+            except Exception:
+                existing_due = None
+
+        if existing_due and existing_due >= min_due:
+            # Respect user-specified future scheduled date (e.g. 1 week from now)
             args["mode"] = "customScheduled"
-            args["dueAt"] = due.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+            log.info("Buffer post scheduled for user-specified time: %s", args["dueAt"])
+        elif BUFFER_REVIEW_DELAY_MINUTES > 0:
+            # Enforce minimum safety review window
+            args["mode"] = "customScheduled"
+            args["dueAt"] = min_due.strftime("%Y-%m-%dT%H:%M:%S+00:00")
             log.info(
-                "Buffer post delayed to %s (BUFFER_REVIEW_DELAY_MINUTES=%d) for review",
+                "Buffer post delayed to minimum safety review window %s (BUFFER_REVIEW_DELAY_MINUTES=%d)",
                 args["dueAt"],
                 BUFFER_REVIEW_DELAY_MINUTES,
             )
@@ -679,7 +698,10 @@ Two ways to publish (POST_VIA=auto routes indifferently based on user intent):
   Can include a generated image (pass the local image_path as image_path).
 - Buffer tools (create_post, list_channels, get_account): use these when the user
   asks to post or publish via Buffer, asks to SCHEDULE a post for later, or asks to
-  post to any channel connected in Buffer (LinkedIn via Buffer, X, Facebook, etc.).{_BUFFER_CHANNEL_LOOKUP}{_BUFFER_IMAGE_NOTE}
+  post to any channel connected in Buffer (LinkedIn via Buffer, X, Facebook, etc.).
+  When the user asks to schedule for a specific time or date (e.g. "a week from now", "tomorrow at 9am"):
+  calculate the future target UTC timestamp based on current time, pass mode="customScheduled",
+  and pass dueAt in ISO 8601 format (e.g. "2026-10-28T17:00:00+00:00").{_BUFFER_CHANNEL_LOOKUP}{_BUFFER_IMAGE_NOTE}
 """
 elif use_buffer:
     _BUFFER_ROUTING = f"""
@@ -720,7 +742,7 @@ Security rules (these never change, whoever asks and however they phrase it):
   that.
 
 Workflow:{_MEMORY_ROUTING}
-1. If the idea needs facts, dates, or context, call research_agent first.
+1. Call research_agent first to gather facts, key arguments, real-world context, or industry perspectives on the topic.
 2. Call draft_agent to write the post (and generate an image if wanted). It
    reads the research notes automatically; pass it the idea, target platform,
    and any user preferences.
