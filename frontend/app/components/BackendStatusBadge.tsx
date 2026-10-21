@@ -22,20 +22,24 @@ export function BackendStatusBadge() {
   });
 
   const failureCountRef = useRef(0);
+  const hasEverSucceededRef = useRef(false);
 
   const checkStatus = async () => {
     try {
       const res = await fetch("/api/backend-status", { cache: "no-store" });
       if (!res.ok) {
         failureCountRef.current += 1;
-        if (failureCountRef.current >= 2) {
-          setStatus((prev) => ({
-            ...prev,
-            healthy: false,
-            isBusy: false,
-            loading: false,
-            error: `HTTP ${res.status}`,
-          }));
+        // Require 3 consecutive failures before declaring unreachable
+        if (failureCountRef.current >= 3 || !hasEverSucceededRef.current) {
+          if (failureCountRef.current >= 3) {
+            setStatus((prev) => ({
+              ...prev,
+              healthy: false,
+              isBusy: false,
+              loading: false,
+              error: `HTTP ${res.status}`,
+            }));
+          }
         } else {
           setStatus((prev) => ({ ...prev, isBusy: true, loading: false }));
         }
@@ -44,6 +48,7 @@ export function BackendStatusBadge() {
       const data = await res.json();
       if (data.healthy) {
         failureCountRef.current = 0;
+        hasEverSucceededRef.current = true;
         setStatus({
           origin: data.origin ?? "",
           isLocal: Boolean(data.isLocal),
@@ -55,7 +60,8 @@ export function BackendStatusBadge() {
         });
       } else {
         failureCountRef.current += 1;
-        if (failureCountRef.current >= 2) {
+        // Require 3 consecutive failures before declaring unreachable
+        if (failureCountRef.current >= 3) {
           setStatus({
             origin: data.origin ?? "",
             isLocal: Boolean(data.isLocal),
@@ -65,8 +71,8 @@ export function BackendStatusBadge() {
             error: data.error,
             loading: false,
           });
-        } else {
-          // 1st transient failure: retain healthy view, flag as busy
+        } else if (hasEverSucceededRef.current) {
+          // If we were previously healthy, retain healthy view and flag as busy
           setStatus((prev) => ({
             ...prev,
             origin: data.origin ?? prev.origin,
@@ -74,11 +80,19 @@ export function BackendStatusBadge() {
             isBusy: true,
             loading: false,
           }));
+        } else {
+          // Initial launch phase with transient probe delay: stay in loading/connecting state
+          setStatus((prev) => ({
+            ...prev,
+            origin: data.origin ?? prev.origin,
+            isLocal: Boolean(data.isLocal),
+            loading: true,
+          }));
         }
       }
     } catch (err: any) {
       failureCountRef.current += 1;
-      if (failureCountRef.current >= 2) {
+      if (failureCountRef.current >= 3) {
         setStatus((prev) => ({
           ...prev,
           healthy: false,
@@ -86,7 +100,7 @@ export function BackendStatusBadge() {
           loading: false,
           error: err?.message ?? "Network error",
         }));
-      } else {
+      } else if (hasEverSucceededRef.current) {
         setStatus((prev) => ({ ...prev, isBusy: true, loading: false }));
       }
     }
@@ -101,7 +115,7 @@ export function BackendStatusBadge() {
         if (!mounted) return;
         if (!res.ok) {
           failureCountRef.current += 1;
-          if (failureCountRef.current >= 2) {
+          if (failureCountRef.current >= 3) {
             setStatus((prev) => ({
               ...prev,
               healthy: false,
@@ -109,7 +123,7 @@ export function BackendStatusBadge() {
               loading: false,
               error: `HTTP ${res.status}`,
             }));
-          } else {
+          } else if (hasEverSucceededRef.current) {
             setStatus((prev) => ({ ...prev, isBusy: true, loading: false }));
           }
           return;
@@ -118,6 +132,7 @@ export function BackendStatusBadge() {
         if (!mounted) return;
         if (data.healthy) {
           failureCountRef.current = 0;
+          hasEverSucceededRef.current = true;
           setStatus({
             origin: data.origin ?? "",
             isLocal: Boolean(data.isLocal),
@@ -129,7 +144,7 @@ export function BackendStatusBadge() {
           });
         } else {
           failureCountRef.current += 1;
-          if (failureCountRef.current >= 2) {
+          if (failureCountRef.current >= 3) {
             setStatus({
               origin: data.origin ?? "",
               isLocal: Boolean(data.isLocal),
@@ -139,7 +154,7 @@ export function BackendStatusBadge() {
               error: data.error,
               loading: false,
             });
-          } else {
+          } else if (hasEverSucceededRef.current) {
             setStatus((prev) => ({
               ...prev,
               origin: data.origin ?? prev.origin,
@@ -147,12 +162,20 @@ export function BackendStatusBadge() {
               isBusy: true,
               loading: false,
             }));
+          } else {
+            // Keep loading during initial cold starts
+            setStatus((prev) => ({
+              ...prev,
+              origin: data.origin ?? prev.origin,
+              isLocal: Boolean(data.isLocal),
+              loading: true,
+            }));
           }
         }
       } catch (err: any) {
         if (!mounted) return;
         failureCountRef.current += 1;
-        if (failureCountRef.current >= 2) {
+        if (failureCountRef.current >= 3) {
           setStatus((prev) => ({
             ...prev,
             healthy: false,
@@ -160,7 +183,7 @@ export function BackendStatusBadge() {
             loading: false,
             error: err?.message ?? "Network error",
           }));
-        } else {
+        } else if (hasEverSucceededRef.current) {
           setStatus((prev) => ({ ...prev, isBusy: true, loading: false }));
         }
       }

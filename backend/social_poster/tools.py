@@ -19,7 +19,10 @@ OUTPUTS_DIR = pathlib.Path(__file__).resolve().parents[2] / "gallery"
 
 
 def generate_image(prompt: str) -> dict:
-    """Generates an illustration image for a social media post.
+    """Generates an illustration image for a social media post with cascading model fallback.
+
+    Prefers Gemini 3.5/3.1/Imagen models, automatically falling back to gemini-2.5-flash-image
+    if newer publisher models are not yet available in the deployment region.
 
     Args:
         prompt: A detailed visual description of the image to generate.
@@ -28,36 +31,53 @@ def generate_image(prompt: str) -> dict:
         dict with 'status', and on success 'image_path' (local file path)
         or on failure an 'error' message.
     """
-    # Fallback to gemini-2.5-flash-image (verified available in Vertex AI us-central1)
-    # Avoid obsolete or unreleased model names like gemini-3.1-flash-image that return 404 NOT_FOUND.
-    model = os.environ.get("IMAGE_MODEL_ID", "gemini-2.5-flash-image")
+    configured_model = os.environ.get("IMAGE_MODEL_ID")
+    candidate_models = []
+    if configured_model and configured_model.strip():
+        candidate_models.append(configured_model.strip())
+    
+    # Priority cascade: Gemini 3.5 -> Gemini 3.1 -> Imagen 3.0 -> Gemini 2.5
+    for fallback in [
+        "gemini-3.5-flash-image",
+        "gemini-3.1-flash-image",
+        "imagen-3.0-generate-002",
+        "gemini-2.5-flash-image",
+    ]:
+        if fallback not in candidate_models:
+            candidate_models.append(fallback)
+
     client = genai.Client()  # picks up GOOGLE_GENAI_USE_VERTEXAI / project / location
-    try:
-        response = client.models.generate_content(
-            model=model,
-            contents=prompt,
-            config=genai_types.GenerateContentConfig(
-                response_modalities=["TEXT", "IMAGE"],
-            ),
-        )
-    except Exception as e:  # surface API errors to the model as a tool result
-        return {"status": "error", "error": str(e)}
+    last_error = None
 
-    if not response.candidates:
-        return {"status": "error", "error": "Model returned no candidates (likely blocked by safety filters)."}
+    for model in candidate_models:
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=genai_types.GenerateContentConfig(
+                    response_modalities=["TEXT", "IMAGE"],
+                ),
+            )
+            if not response.candidates:
+                continue
 
-    for part in response.candidates[0].content.parts:
-        if part.inline_data and part.inline_data.mime_type.startswith("image/"):
-            OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
-            ext = part.inline_data.mime_type.split("/")[-1]
-            # uuid suffix: two images generated within the same second
-            # (e.g. LinkedIn + X drafts back to back) would otherwise silently
-            # overwrite each other on the timestamp alone.
-            path = OUTPUTS_DIR / f"post-image-{int(time.time())}-{uuid.uuid4().hex[:8]}.{ext}"
-            path.write_bytes(part.inline_data.data)
-            return {"status": "success", "image_path": str(path)}
+            for part in response.candidates[0].content.parts:
+                if part.inline_data and part.inline_data.mime_type.startswith("image/"):
+                    OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+                    ext = part.inline_data.mime_type.split("/")[-1]
+                    path = OUTPUTS_DIR / f"post-image-{int(time.time())}-{uuid.uuid4().hex[:8]}.{ext}"
+                    path.write_bytes(part.inline_data.data)
+                    return {"status": "success", "image_path": str(path), "model_used": model}
+        except Exception as e:
+            err_str = str(e)
+            last_error = err_str
+            # If model is 404 NOT_FOUND, try next candidate in priority cascade
+            if "404" in err_str or "not found" in err_str.lower():
+                continue
+            # For other errors (e.g. safety filter, 429), return immediately
+            return {"status": "error", "error": err_str}
 
-    return {"status": "error", "error": "Model returned no image data."}
+    return {"status": "error", "error": f"All image candidate models failed. Last error: {last_error}"}
 
 
 SIGNED_URL_EXPIRY_HOURS = int(os.environ.get("SIGNED_URL_EXPIRY_HOURS", "168"))  # 7 days, V4's max

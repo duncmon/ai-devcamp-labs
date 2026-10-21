@@ -140,13 +140,55 @@ def content_config(screen_input: bool = True) -> Optional[genai_types.GenerateCo
     )
 
 
+class FallbackGemini(Gemini):
+  """Gemini model adapter with automatic cascading fallback for retired or unreleased models.
+
+  Prefers Gemini 3.5 / 3.0 models; falls back gracefully to Gemini 2.5 GA models
+  if 404 NOT_FOUND is returned by the Vertex AI publisher endpoint."""
+  fallback_models: list[str] = []
+
+  async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False):
+    models_to_try = [self.model] + [m for m in self.fallback_models if m != self.model]
+    last_err = None
+    for candidate in models_to_try:
+      try:
+        llm_request.model = candidate
+        async for resp in super().generate_content_async(llm_request, stream=stream):
+          yield resp
+        return
+      except Exception as e:
+        err_str = str(e)
+        if "404" in err_str or "not found" in err_str.lower():
+          log.warning(
+              "Model %s returned 404 NOT_FOUND; falling back to next candidate in cascade...",
+              candidate,
+          )
+          last_err = e
+          continue
+        raise e
+    if last_err:
+      raise last_err
+
+
 def model(name: str):
-    """The model for an agent, wrapped in ADK's Gemini class with robust retry options.
+    """The model for an agent, wrapped in FallbackGemini with cascading model support and retries.
     
-    Protects against transient 429 RESOURCE_EXHAUSTED bursts on Vertex AI shared regional
-    infrastructure and sporadic 400 template lookup glitches on Agent Platform."""
-    return Gemini(
+    Protects against model deprecation/removal (Gemini 2.5) and premature model unavailability
+    (Gemini 3.5), with role-based fallbacks to reduce execution costs."""
+    fallbacks = []
+    if "flash-lite" in name.lower():
+        # Research role: keep costs lowest
+        fallbacks = ["gemini-3.5-flash-lite", "gemini-3.0-flash-lite", "gemini-2.5-flash-lite"]
+    elif "pro" in name.lower():
+        # High reasoning role
+        fallbacks = ["gemini-3.5-pro", "gemini-3.1-pro-preview", "gemini-2.5-pro", "gemini-2.5-flash"]
+    else:
+        # Default/Orchestrator/Draft role
+        fallbacks = ["gemini-3.5-flash", "gemini-3.0-flash", "gemini-2.5-flash"]
+
+    return FallbackGemini(
         model=name,
+        fallback_models=fallbacks,
         retry_options=RETRY_CONFIG,
     )
 

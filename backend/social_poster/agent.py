@@ -113,9 +113,9 @@ BACKEND_PUBLIC_ORIGIN = os.environ.get(
 # gemini-flash-lite-latest started returning 404 overnight (2026-10-02), which
 # broke every agent at once. gemini-2.5-flash is reported to retire on
 # 2026-10-16; the 3.5 family (gemini-3.5-flash / -flash-lite) is next.
-RESEARCH_MODEL = os.environ.get("RESEARCH_MODEL", "gemini-2.5-flash")
-DRAFT_MODEL = os.environ.get("DRAFT_MODEL", "gemini-2.5-flash")
-ORCHESTRATOR_MODEL = os.environ.get("ORCHESTRATOR_MODEL", "gemini-2.5-flash")
+RESEARCH_MODEL = os.environ.get("RESEARCH_MODEL", "gemini-3.5-flash-lite")
+DRAFT_MODEL = os.environ.get("DRAFT_MODEL", "gemini-3.5-flash")
+ORCHESTRATOR_MODEL = os.environ.get("ORCHESTRATOR_MODEL", "gemini-3.5-flash")
 
 
 # --- Specialist: research -----------------------------------------------------

@@ -815,6 +815,33 @@ $ curl -s http://localhost:3000/api/backend-status | jq .
             <li><strong>Fail-Closed Gateway SSE Stream Transformation:</strong> In <code>frontend/app/api/adk/route.ts</code>, we added in-stream interception for <code>agent_run_error_event</code>. If upstream exhausts all retries and emits a 429 event, the proxy transforms the raw exception into a helpful Markdown assistant card explaining regional demand spikes and offering retry advice, completely preventing raw CopilotKit React modal crashes.</li>
           </ul>
         </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🎯</span> 10. Role-Based Cost Optimization &amp; Gemini Deprecation Resilience (Hierarchical Fallback Cascade)</div>
+          <p>
+            <strong>The Problem:</strong> Detailed review of execution traces and lab architecture uncovered two critical considerations:
+          </p>
+          <ul>
+            <li><strong>Role-Based Cost Deviation:</strong> In Lab 1, the instructor architecture established distinct roles to minimize token spend: lightweight high-throughput Flash-Lite for web search and research grounding, and standard Flash/Pro for synthesis and post drafting. In earlier runs, uniform models (or Pro tiers) were inadvertently applied across all turns, inflating execution costs.</li>
+            <li><strong>Model Deprecation Horizon &amp; Regional Availability:</strong> Google Cloud regularly deprecates preview and early model versions (e.g. gradual sunsetting of Gemini 2.0 / 2.5 series in favor of Gemini 3, 3.5, and 3.8). Statically hardcoding model strings creates ticking operational liabilities if a model is deprecated or not yet deployed in a specific region (such as <code>us-central1</code> returning <code>HTTP 404 NOT_FOUND</code>).</li>
+            <li><strong>Image Generation Stale Cloud Code:</strong> In cloud mode, image generation failed because the deployed Reasoning Engine container (<code>1836136314752204800</code>) dated from prior deployment commits where <code>IMAGE_MODEL_ID</code> was hardcoded or defaulted to an unsupported model ID without fallback.</li>
+          </ul>
+          <p>
+            <strong>The Solution:</strong> We implemented an enterprise hierarchical fallback architecture across both textual agents and multimodal image tools:
+          </p>
+          <ul>
+            <li><strong>Subclassed <code>FallbackGemini(Gemini)</code> in <code>guardrails.py</code>:</strong> Extends the ADK <code>Gemini</code> model with an ordered candidate list (e.g., <code>[gemini-3.5-flash-lite, gemini-3.0-flash-lite, gemini-2.5-flash-lite]</code>). If the primary model returns <code>HTTP 404 NOT_FOUND</code>, the wrapper catches the error, logs a clean diagnostic warning, and immediately transparently retries against the next GA candidate model.</li>
+            <li><strong>Tiered Role Assignments:</strong>
+              <ul>
+                <li><code>research_agent</code>: Primary <code>gemini-3.5-flash-lite</code> (fallbacks: <code>gemini-3.0-flash-lite</code>, <code>gemini-2.5-flash-lite</code>) — lowest token cost for rapid web scraping and search summarization.</li>
+                <li><code>draft_agent</code>: Primary <code>gemini-3.5-flash</code> (fallbacks: <code>gemini-3.0-flash</code>, <code>gemini-2.5-flash</code>, <code>gemini-2.5-pro</code>) — balanced reasoning and social tone styling.</li>
+                <li><code>root_agent</code> (Orchestrator): Primary <code>gemini-3.5-flash</code> (fallbacks: <code>gemini-3.0-flash</code>, <code>gemini-2.5-flash</code>) — fast subagent dispatch and tool calling.</li>
+              </ul>
+            </li>
+            <li><strong>Cascading Image Generation in <code>tools.py</code>:</strong> Upgraded <code>generate_image()</code> to probe candidate models in priority sequence: <code>[configured_ID, "gemini-3.5-flash-image", "gemini-3.1-flash-image", "imagen-3.0-generate-002", "gemini-2.5-flash-image"]</code>. Live probing verified that 404s on 3.5/3.1/Imagen-3 are cleanly bypassed, generating the PNG with <code>gemini-2.5-flash-image</code>.</li>
+            <li><strong>Cloud Deployment Workflow:</strong> Because Vertex AI Reasoning Engine runs the packaged container image uploaded at deploy time, these backend enhancements are packaged for the cloud via <code>uv run agents-cli deploy</code>.</li>
+          </ul>
+        </div>
       </div>
     </article>
 
@@ -951,6 +978,14 @@ $ curl -s http://localhost:3000/api/backend-status | jq .
             <strong>Figure 15 — Active Cloud Profile Execution &amp; Latency Traces:</strong> Next.js terminal logs displaying fast background health probes (<code>GET /api/backend-status 200</code> in 837ms–1578ms) and the active blue status badge <code>☁ Vertex AI (us-central1:1836…)</code>, demonstrating normal baseline latency between prompt execution spikes.
           </figcaption>
         </figure>
+
+        <!-- Figure 16 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab1-step8-cloud-run-all-stages-posted.png" alt="Cloud Run Execution with All Stages Posted and Image Failure Identified" loading="lazy">
+          <figcaption>
+            <strong>Figure 16 — Cloud Execution Lifecycle with All Stages Posted:</strong> Full end-to-end execution of Social Spark on Vertex AI Agent Runtime (Session <code>151756415931777024</code>). The orchestrator coordinated <code>research_agent</code> and <code>draft_agent</code>, posted the content across all configured stages, and displayed the final output in the dashboard. The missing image card directly confirmed the stale container code issue, pinpointing the need for the multi-tiered cascading fallback and redeployment workflow.
+          </figcaption>
+        </figure>
       </div>
     </article>
 
@@ -1009,9 +1044,27 @@ $ curl -s http://localhost:3000/api/backend-status | jq .
               <td><span class="badge green">PASS</span></td>
             </tr>
             <tr>
+              <td><strong>Status Badge Hysteresis</strong></td>
+              <td>Inspect <code>BackendStatusBadge.tsx</code></td>
+              <td>Maintains loading on startup; requires 3 consecutive failures before red</td>
+              <td><span class="badge green">PASS</span></td>
+            </tr>
+            <tr>
               <td><strong>Fail-Closed Interception</strong></td>
               <td>Simulate 404 on <code>POST /api/adk</code></td>
               <td>5-event AG-UI SSE stream delivered, HTTP 200</td>
+              <td><span class="badge green">PASS</span></td>
+            </tr>
+            <tr>
+              <td><strong>Role-Based Model Tiering</strong></td>
+              <td>Inspect <code>guardrails.py</code> &amp; <code>agent.py</code></td>
+              <td>Research uses Flash-Lite, Draft/Root use Flash; 404 auto-fallback configured</td>
+              <td><span class="badge green">PASS</span></td>
+            </tr>
+            <tr>
+              <td><strong>Cascading Image Generation</strong></td>
+              <td><code>uv run python -c "from backend.social_poster.tools import generate_image; ..."</code></td>
+              <td>Probes 3.5 &rarr; 3.1 &rarr; Imagen &rarr; 2.5; generates image with 2.5-flash-image</td>
               <td><span class="badge green">PASS</span></td>
             </tr>
           </tbody>
