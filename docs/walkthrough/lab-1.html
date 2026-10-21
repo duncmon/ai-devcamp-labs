@@ -862,6 +862,44 @@ linkedin_toolset = McpToolset(
               </ol>
             </figcaption>
           </figure>
+
+          <figure class="evidence-figure" style="margin-top: 24px;">
+            <img src="../screenshots/lab1-step9-buffer-confirmation-card.png" alt="Lab 1 Step 9: Buffer MCP Human Approval Card" loading="lazy">
+            <figcaption>
+              <strong>Figure 9.3 — Buffer Human Approval Gate with MCP Parameters &amp; Signed GCS Media:</strong> In the golden path run using the Buffer MCP publisher, the agent crafts the post, generates the visual asset, uploads it to GCS, and pauses at the confirmation gate. Key attributes verified:
+              <ol style="margin-top: 8px; padding-left: 20px;">
+                <li><strong>Dynamic Channel Targeting:</strong> Target channel <code>6abe6ba6ea19ca0bde43ee9d</code> (DryTesting Company LinkedIn page) queried autonomously via Buffer MCP.</li>
+                <li><strong>Media Attachment:</strong> High-resolution illustration referenced via temporary signed GCS URL (<code>https://storage.googleapis.com/lab2-bucket-ai-devcamp-duncan-395792/...</code>) passed cleanly to Buffer.</li>
+                <li><strong>Safety Confirmation Card:</strong> Interactive CopilotKit confirmation card providing full inspection of post body, tags, and scheduling parameters with explicit <em>Approve</em> / <em>Reject</em> controls.</li>
+              </ol>
+            </figcaption>
+          </figure>
+
+          <figure class="evidence-figure" style="margin-top: 24px;">
+            <img src="../screenshots/lab1-step9-buffer-post-published-ui.png" alt="Lab 1 Step 9: Post Published via Buffer with Posted State Transition" loading="lazy">
+            <figcaption>
+              <strong>Figure 9.4 — Successful Buffer MCP Dispatch &amp; Pipeline Completion:</strong> Upon attendee approval, the agent executes <code>create_post</code> via Buffer MCP. Verified highlights:
+              <ol style="margin-top: 8px; padding-left: 20px;">
+                <li><strong>State Transition:</strong> The pipeline progress bar synchronously completes to <em>Posted</em> (6 of 6 stages).</li>
+                <li><strong>Publisher Badge:</strong> The post display card updates with an authentic green <code>BUFFER</code> publisher badge and exact post title.</li>
+                <li><strong>Audit Confirmation:</strong> Agent confirms dispatch with the Buffer Post ID (<code>68f7b7cb34757c96cfd1f855</code>) scheduled to the DryTesting Company queue.</li>
+              </ol>
+            </figcaption>
+          </figure>
+
+          <figure class="evidence-figure" style="margin-top: 24px;">
+            <img src="../screenshots/lab1-step9-buffer-dashboard-queue.png" alt="Lab 1 Step 9: Live Buffer Dashboard Queue Verification" loading="lazy">
+            <figcaption>
+              <strong>Figure 9.5 — External System Verification in Buffer Dashboard:</strong> Proof in the external Buffer dashboard (<code>publish.buffer.com</code>). The post is queued in <em>DryTesting Company</em> with the generated illustration, body text, and schedule.
+            </figcaption>
+          </figure>
+
+          <figure class="evidence-figure" style="margin-top: 24px;">
+            <img src="../screenshots/lab1-step9-buffer-modal-linkedin-preview.png" alt="Lab 1 Step 9: Buffer Modal LinkedIn Preview" loading="lazy">
+            <figcaption>
+              <strong>Figure 9.6 — Buffer LinkedIn Preview Modal:</strong> Expanding the scheduled post inside Buffer verifies full fidelity: formatted hook question, bullet points, technical hashtags, and generated asset ready for publication.
+            </figcaption>
+          </figure>
         </div>
 
         <div class="part-section">
@@ -869,7 +907,11 @@ linkedin_toolset = McpToolset(
             <div class="checkpoint-title"><span class="icon">✅</span> Step 9 Checkpoint: The Complete Golden Path Verification</div>
             <div class="checkpoint-content">
               <p><strong>Requirement:</strong> The stage panel tracks the run live (Idea → Researching → Drafting → Approval → Posted); activity feed shows every tool call with expandable arguments/results; confirmation card appears before publishing; on Approve, response appears in chat.</p>
-              <p><strong>Fulfillment:</strong> Verified in Figure 9.1 (<a href="../screenshots/lab1-golden-runthrough.png" target="_blank">lab1-golden-runthrough.png</a>). The full 6-stage lifecycle was executed on the live frontend. The activity feed displayed live tool calls, the draft rendered with technical styling and embedded visual preview, the human-in-the-loop approval banner gated publication, and approval completed the golden loop.</p>
+              <p><strong>Fulfillment:</strong> Fully verified across both publishing backends:</p>
+              <ul style="margin-top: 6px; padding-left: 20px;">
+                <li><strong>LinkedIn Golden Path (Figures 9.1 &amp; 9.2):</strong> All 6 pipeline stages completed live on <code>localhost:8090</code> and Vertex AI Agent Runtime, with Imagen multimodal illustration saved to GCS (<code>lab2-bucket-ai-devcamp-duncan-395792</code>), interactive confirmation card, and posted state transition.</li>
+                <li><strong>Buffer Golden Path (Figures 9.3–9.6):</strong> Verified end-to-end execution through the remote Buffer MCP publisher. Figure 9.3 shows the interactive confirmation gate with GCS signed media URL; Figure 9.4 shows successful dispatch with green <code>BUFFER</code> badge and post ID <code>68f7b7cb34757c96cfd1f855</code>; and Figures 9.5 &amp; 9.6 corroborate the scheduled post live in the Buffer dashboard queue and LinkedIn preview modal.</li>
+              </ul>
             </div>
           </div>
         </div>
