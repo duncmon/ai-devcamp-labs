@@ -105,6 +105,28 @@ export async function POST(req: Request) {
       return makeDiagnosticEventStream(threadId, runId, diag);
     }
 
+    if (upstream.status === 429) {
+      const diag = isRemote
+        ? `⚠️ **Vertex AI Capacity Temporarily Exhausted (HTTP 429 RESOURCE_EXHAUSTED)**\n\n` +
+          `Google Cloud Vertex AI reported that regional shared model capacity in \`us-central1\` ` +
+          `is temporarily exhausted under current burst demand.\n\n` +
+          `**Probable Causes:**\n` +
+          `- Burst of concurrent requests across multi-agent loops (researcher, drafter, orchestrator).\n` +
+          `- Shared regional quotas on Gemini 2.5 models.\n\n` +
+          `**Resolution Steps:**\n` +
+          `1. **Wait and Retry:** Wait 5–10 seconds and submit your prompt again (ADK automatic exponential backoff with jitter will smooth subsequent requests).\n` +
+          `2. **Switch to Local Development:**\n` +
+          `   \`\`\`bash\n` +
+          `   ./run-backend.sh\n` +
+          `   ./run-frontend.sh --local\n` +
+          `   \`\`\`\n` +
+          `3. **Reference:** Learn more at [Google ADK Gemini Rate Limits](https://google.github.io/adk-docs/agents/models/google-gemini/#error-code-429-resource_exhausted).`
+        : `⚠️ **Local Rate Limit Exceeded (HTTP 429)**\n\n` +
+          `Rate limit exceeded. Please wait a moment and try again.`;
+
+      return makeDiagnosticEventStream(threadId, runId, diag);
+    }
+
     if (upstream.status === 401 || upstream.status === 403) {
       const diag = isRemote
         ? `⚠️ **Vertex AI Authentication / Permission Error (HTTP ${upstream.status})**\n\n` +
@@ -140,7 +162,100 @@ export async function POST(req: Request) {
       return makeDiagnosticEventStream(threadId, runId, diag);
     }
 
-    return new Response(upstream.body, {
+    // Intercept in-stream fatal errors (e.g. agent_run_error_event with 429 RESOURCE_EXHAUSTED)
+    // so CopilotKit renders a clean diagnostic card rather than an unhandled modal error crash.
+    let responseBody = upstream.body;
+    const contentType = upstream.headers.get("content-type") ?? "";
+    if (upstream.body && contentType.includes("text/event-stream")) {
+      const decoder = new TextDecoder();
+      const encoder = new TextEncoder();
+      let buffer = "";
+
+      const transform = new TransformStream({
+        transform(chunk, controller) {
+          buffer += decoder.decode(chunk, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const dataStr = line.slice(6).trim();
+              if (
+                dataStr &&
+                (dataStr.includes("agent_run_error_event") ||
+                  dataStr.includes("RESOURCE_EXHAUSTED"))
+              ) {
+                try {
+                  const messageId = `diag-${Date.now()}`;
+                  const diagMsg = isRemote
+                    ? `⚠️ **Vertex AI Capacity Temporarily Exhausted (HTTP 429 RESOURCE_EXHAUSTED)**\n\n` +
+                      `Google Cloud Vertex AI reported that regional shared model capacity in \`us-central1\` ` +
+                      `is temporarily exhausted under current burst demand.\n\n` +
+                      `**Resolution Steps:**\n` +
+                      `1. **Wait and Retry:** Wait 5–10 seconds and submit your prompt again (ADK automatic exponential backoff with jitter will smooth subsequent requests).\n` +
+                      `2. **Switch to Local Development:**\n` +
+                      `   \`\`\`bash\n` +
+                      `   ./run-backend.sh\n` +
+                      `   ./run-frontend.sh --local\n` +
+                      `   \`\`\`\n` +
+                      `3. **Reference:** Learn more at [Google ADK Gemini Rate Limits](https://google.github.io/adk-docs/agents/models/google-gemini/#error-code-429-resource_exhausted).`
+                    : `⚠️ **Rate Limit Exceeded (HTTP 429)**\n\nPlease wait a moment and try again.`;
+
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        type: "TEXT_MESSAGE_START",
+                        messageId,
+                        role: "assistant",
+                      })}\n\n`,
+                    ),
+                  );
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        type: "TEXT_MESSAGE_CONTENT",
+                        messageId,
+                        delta: diagMsg,
+                      })}\n\n`,
+                    ),
+                  );
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        type: "TEXT_MESSAGE_END",
+                        messageId,
+                      })}\n\n`,
+                    ),
+                  );
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        type: "RUN_FINISHED",
+                        threadId,
+                        runId,
+                      })}\n\n`,
+                    ),
+                  );
+                  continue;
+                } catch {
+                  // Fall through to emit raw line on parse error
+                }
+              }
+            }
+            controller.enqueue(encoder.encode(line + "\n"));
+          }
+        },
+        flush(controller) {
+          if (buffer) {
+            controller.enqueue(encoder.encode(buffer));
+          }
+        },
+      });
+
+      responseBody = upstream.body.pipeThrough(transform);
+    }
+
+    return new Response(responseBody, {
       status: upstream.status,
       headers: {
         "content-type":

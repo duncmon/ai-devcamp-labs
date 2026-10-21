@@ -13,18 +13,22 @@ export async function GET() {
     pragma: "no-cache",
   };
 
+  const primaryTimeout = isLocal ? 2500 : 8000;
+  const fallbackTimeout = isLocal ? 1500 : 4000;
+
   try {
     // Probe backend using /openapi.json (universally supported on local FastAPI
     // and Cloud Vertex AI Agent Runtime reverse proxy, whereas /healthz is reserved/unrouted
-    // on Agent Engine). Fall back defensively to /api/posts. Timeout set to 4000ms
-    // to accommodate cold-starts on serverless runtimes.
+    // on Agent Engine). Fall back defensively to /api/posts.
+    // Adaptive timeouts: 8000ms for cloud (prevents false timeouts when container is busy
+    // executing prompts) and 2500ms for local loopback.
     let probeRes = await backendFetch("/openapi.json", {
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(primaryTimeout),
     }).catch(() => null);
 
     if (!probeRes || !probeRes.ok) {
       probeRes = await backendFetch("/api/posts", {
-        signal: AbortSignal.timeout(2000),
+        signal: AbortSignal.timeout(fallbackTimeout),
       }).catch(() => null);
     }
 

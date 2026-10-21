@@ -740,6 +740,16 @@ a {
   color: var(--g-blue);
 }
 
+.backend-badge.badge-busy {
+  border-color: #aecbfa;
+  background: var(--g-blue-tint);
+  color: var(--g-blue);
+}
+
+.backend-badge.badge-busy .badge-icon {
+  animation: pulse-dot 1.2s infinite ease-in-out;
+}
+
 .backend-badge.badge-unreachable {
   border-color: #f6aea9;
   background: #fce8e6;

@@ -98,57 +98,56 @@ def _template(template_id: str) -> str:
     return f"projects/{DLP_PROJECT}/locations/{MA_REGION}/templates/{template_id}"
 
 
+# Shared exponential backoff and jitter configuration for Gemini models.
+# Handles transient Vertex AI shared capacity limits (429 RESOURCE_EXHAUSTED),
+# random Model Armor template lookup glitches (400), request timeouts (408),
+# and transient gateway/service unavailable errors (500, 502, 503, 504).
+# Based on official Google ADK resilience recommendations:
+# https://google.github.io/adk-docs/agents/models/google-gemini/#error-code-429-resource_exhausted
+RETRY_CONFIG = genai_types.HttpRetryOptions(
+    attempts=6,
+    initial_delay=1.5,
+    max_delay=32.0,
+    exp_base=2.0,
+    jitter=0.5,
+    http_status_codes=[400, 408, 429, 500, 502, 503, 504],
+)
+
+
 def content_config(screen_input: bool = True) -> Optional[genai_types.GenerateContentConfig]:
-    """GenerateContentConfig that makes Agent Platform screen this agent's model calls.
+    """GenerateContentConfig that configures Model Armor screening and ADK retries.
 
     screen_input=False for the internal sub-agents: their input is text the
     orchestrator wrote, not the user's, so only the reply is screened.
-    Returns None when guardrails are off. If GOOGLE_CLOUD_LOCATION is `global`
-    the calls will fail with "template not found": deliberately left loud
-    (fail closed) rather than silently dropping the guardrail.
+    If GOOGLE_CLOUD_LOCATION is `global` the calls will fail with "template not found":
+    deliberately left loud (fail closed) rather than silently dropping the guardrail.
     """
-    if not MA_TEMPLATE:
-        return None
-    if os.environ.get("GOOGLE_CLOUD_LOCATION", "global") == "global":
-        log.error(
-            "Model Armor is on but GOOGLE_CLOUD_LOCATION is global: Gemini calls "
-            "will be rejected (template not found). Use a regional location."
-        )
-    return genai_types.GenerateContentConfig(
-        model_armor_config=genai_types.ModelArmorConfig(
+    model_armor = None
+    if MA_TEMPLATE:
+        if os.environ.get("GOOGLE_CLOUD_LOCATION", "global") == "global":
+            log.error(
+                "Model Armor is on but GOOGLE_CLOUD_LOCATION is global: Gemini calls "
+                "will be rejected (template not found). Use a regional location."
+            )
+        model_armor = genai_types.ModelArmorConfig(
             prompt_template_name=_template(MA_TEMPLATE) if screen_input else None,
             response_template_name=_template(MA_OUTPUT_TEMPLATE),
         )
+
+    return genai_types.GenerateContentConfig(
+        model_armor_config=model_armor,
+        http_options=genai_types.HttpOptions(retry_options=RETRY_CONFIG),
     )
 
 
 def model(name: str):
-    """The model for an agent. When Model Armor is on, wrap it in ADK's Gemini class
-    with retry options: Agent Platform's template lookup fails at random ("template ... was
-    not found", roughly half of guarded calls in testing) and a retry usually
-    succeeds. The retry must live on the ADK model object; the same options in the
-    request config were ignored inside the deployed agent."""
-    if not MA_TEMPLATE:
-        # No Model Armor: still retry 429/503. Agent Platform answers bursts
-        # with 429 RESOURCE_EXHAUSTED even on GA models (seen on gemini-2.5-pro
-        # inside draft_agent), and an unretried one kills the whole turn.
-        return Gemini(
-            model=name,
-            retry_options=genai_types.HttpRetryOptions(
-                attempts=5, initial_delay=2, max_delay=30, exp_base=2,
-                http_status_codes=[429, 503],
-            ),
-        )
+    """The model for an agent, wrapped in ADK's Gemini class with robust retry options.
+    
+    Protects against transient 429 RESOURCE_EXHAUSTED bursts on Vertex AI shared regional
+    infrastructure and sporadic 400 template lookup glitches on Agent Platform."""
     return Gemini(
         model=name,
-        # 400 = the random "template not found". 429 = Agent Platform saying the regional Gemini
-        # model is out of (shared) capacity, seen in a burst of requests: our project had
-        # no quota-exceeded events and unlimited per-minute limits. Every guarded turn makes
-        # several model calls and a retry is another, so back off properly.
-        retry_options=genai_types.HttpRetryOptions(
-            attempts=8, initial_delay=0.3, max_delay=8.0, exp_base=2.0, jitter=0.3,
-            http_status_codes=[400, 429],
-        ),
+        retry_options=RETRY_CONFIG,
     )
 
 

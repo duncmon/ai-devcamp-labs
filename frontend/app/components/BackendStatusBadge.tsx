@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface BackendStatus {
   origin: string;
   isLocal: boolean;
   healthy: boolean;
+  isBusy?: boolean;
   status?: number;
   error?: string;
   loading: boolean;
@@ -16,37 +17,78 @@ export function BackendStatusBadge() {
     origin: "",
     isLocal: true,
     healthy: false,
+    isBusy: false,
     loading: true,
   });
+
+  const failureCountRef = useRef(0);
 
   const checkStatus = async () => {
     try {
       const res = await fetch("/api/backend-status", { cache: "no-store" });
       if (!res.ok) {
-        setStatus((prev) => ({
-          ...prev,
-          healthy: false,
-          loading: false,
-          error: `HTTP ${res.status}`,
-        }));
+        failureCountRef.current += 1;
+        if (failureCountRef.current >= 2) {
+          setStatus((prev) => ({
+            ...prev,
+            healthy: false,
+            isBusy: false,
+            loading: false,
+            error: `HTTP ${res.status}`,
+          }));
+        } else {
+          setStatus((prev) => ({ ...prev, isBusy: true, loading: false }));
+        }
         return;
       }
       const data = await res.json();
-      setStatus({
-        origin: data.origin ?? "",
-        isLocal: Boolean(data.isLocal),
-        healthy: Boolean(data.healthy),
-        status: data.status,
-        error: data.error,
-        loading: false,
-      });
+      if (data.healthy) {
+        failureCountRef.current = 0;
+        setStatus({
+          origin: data.origin ?? "",
+          isLocal: Boolean(data.isLocal),
+          healthy: true,
+          isBusy: false,
+          status: data.status,
+          error: undefined,
+          loading: false,
+        });
+      } else {
+        failureCountRef.current += 1;
+        if (failureCountRef.current >= 2) {
+          setStatus({
+            origin: data.origin ?? "",
+            isLocal: Boolean(data.isLocal),
+            healthy: false,
+            isBusy: false,
+            status: data.status,
+            error: data.error,
+            loading: false,
+          });
+        } else {
+          // 1st transient failure: retain healthy view, flag as busy
+          setStatus((prev) => ({
+            ...prev,
+            origin: data.origin ?? prev.origin,
+            isLocal: Boolean(data.isLocal),
+            isBusy: true,
+            loading: false,
+          }));
+        }
+      }
     } catch (err: any) {
-      setStatus((prev) => ({
-        ...prev,
-        healthy: false,
-        loading: false,
-        error: err?.message ?? "Network error",
-      }));
+      failureCountRef.current += 1;
+      if (failureCountRef.current >= 2) {
+        setStatus((prev) => ({
+          ...prev,
+          healthy: false,
+          isBusy: false,
+          loading: false,
+          error: err?.message ?? "Network error",
+        }));
+      } else {
+        setStatus((prev) => ({ ...prev, isBusy: true, loading: false }));
+      }
     }
   };
 
@@ -58,37 +100,75 @@ export function BackendStatusBadge() {
         const res = await fetch("/api/backend-status", { cache: "no-store" });
         if (!mounted) return;
         if (!res.ok) {
-          setStatus((prev) => ({
-            ...prev,
-            healthy: false,
-            loading: false,
-            error: `HTTP ${res.status}`,
-          }));
+          failureCountRef.current += 1;
+          if (failureCountRef.current >= 2) {
+            setStatus((prev) => ({
+              ...prev,
+              healthy: false,
+              isBusy: false,
+              loading: false,
+              error: `HTTP ${res.status}`,
+            }));
+          } else {
+            setStatus((prev) => ({ ...prev, isBusy: true, loading: false }));
+          }
           return;
         }
         const data = await res.json();
         if (!mounted) return;
-        setStatus({
-          origin: data.origin ?? "",
-          isLocal: Boolean(data.isLocal),
-          healthy: Boolean(data.healthy),
-          status: data.status,
-          error: data.error,
-          loading: false,
-        });
+        if (data.healthy) {
+          failureCountRef.current = 0;
+          setStatus({
+            origin: data.origin ?? "",
+            isLocal: Boolean(data.isLocal),
+            healthy: true,
+            isBusy: false,
+            status: data.status,
+            error: undefined,
+            loading: false,
+          });
+        } else {
+          failureCountRef.current += 1;
+          if (failureCountRef.current >= 2) {
+            setStatus({
+              origin: data.origin ?? "",
+              isLocal: Boolean(data.isLocal),
+              healthy: false,
+              isBusy: false,
+              status: data.status,
+              error: data.error,
+              loading: false,
+            });
+          } else {
+            setStatus((prev) => ({
+              ...prev,
+              origin: data.origin ?? prev.origin,
+              isLocal: Boolean(data.isLocal),
+              isBusy: true,
+              loading: false,
+            }));
+          }
+        }
       } catch (err: any) {
         if (!mounted) return;
-        setStatus((prev) => ({
-          ...prev,
-          healthy: false,
-          loading: false,
-          error: err?.message ?? "Network error",
-        }));
+        failureCountRef.current += 1;
+        if (failureCountRef.current >= 2) {
+          setStatus((prev) => ({
+            ...prev,
+            healthy: false,
+            isBusy: false,
+            loading: false,
+            error: err?.message ?? "Network error",
+          }));
+        } else {
+          setStatus((prev) => ({ ...prev, isBusy: true, loading: false }));
+        }
       }
     };
 
     runProbe();
-    const interval = setInterval(runProbe, 10000);
+    // 15-second polling interval balances observability with network overhead
+    const interval = setInterval(runProbe, 15000);
 
     return () => {
       mounted = false;
@@ -138,8 +218,8 @@ export function BackendStatusBadge() {
 
     return (
       <div
-        className="backend-badge badge-local"
-        title={`Connected to local backend: ${status.origin} — click to re-check`}
+        className={`backend-badge badge-local${status.isBusy ? " badge-busy" : ""}`}
+        title={`Connected to local backend: ${status.origin}${status.isBusy ? " (busy processing...)" : ""} — click to re-check`}
         onClick={checkStatus}
         role="button"
         tabIndex={0}
@@ -167,8 +247,8 @@ export function BackendStatusBadge() {
 
   return (
     <div
-      className="backend-badge badge-cloud"
-      title={`Connected to Vertex AI Reasoning Engine: ${status.origin} — click to re-check`}
+      className={`backend-badge ${status.isBusy ? "badge-busy" : "badge-cloud"}`}
+      title={`Connected to Vertex AI Reasoning Engine: ${status.origin}${status.isBusy ? " (active/busy...)" : ""} — click to re-check`}
       onClick={checkStatus}
       role="button"
       tabIndex={0}
@@ -176,7 +256,7 @@ export function BackendStatusBadge() {
       <span className="badge-icon" aria-hidden="true">
         ☁
       </span>{" "}
-      Vertex AI ({cloudLabel})
+      Vertex AI ({cloudLabel}{status.isBusy ? ":busy" : ""})
     </div>
   );
 }
