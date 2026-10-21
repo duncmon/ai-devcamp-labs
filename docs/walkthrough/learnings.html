@@ -89,7 +89,7 @@
             </ul>
           </div>
           <div>
-            <strong>Pillar 3 (Govern) Discoveries:</strong>
+            <strong>Pillar 3 (Govern) &amp; Security Discoveries:</strong>
             <ul style="margin: 6px 0; padding-left: 18px;">
               <li><a href="#issue-pola">14. Configuration Anti-Pattern &amp; POLA</a></li>
               <li><a href="#issue-dlp-domestic">15. Domestic Phone Detection in Cloud DLP</a></li>
@@ -99,6 +99,9 @@
               <li><a href="#issue-policy-enforce">19. Governance Policy: Existence vs. Enforcement</a></li>
               <li><a href="#issue-inspect-trap">20. The "Inspect-Only" Trap &amp; Fail-Closed Posture</a></li>
               <li><a href="#issue-8mb-quota">21. Vertex AI 8MB Payload Quota Trap</a></li>
+              <li><a href="#issue-model-armor-location">24. Model Armor Regional Binding (<code>us-central1</code> vs <code>global</code> 400 Cascade)</a></li>
+              <li><a href="#issue-regional-vs-multiregion">25. Regional vs. Multi-Regional &amp; Inverted Model Availability Paradox</a></li>
+              <li><a href="#issue-plaintext-secret-breach">26. Plaintext Secret Deployment Breach &amp; AI Invariant Drift</a></li>
             </ul>
           </div>
         </div>
@@ -963,6 +966,90 @@ node_modules/
           <p>
             <strong>Decision:</strong> Maintain single-region <code>us-central1</code> co-location as the primary enterprise architecture, utilizing <code>FallbackGemini</code> for resilient multi-model routing.
           </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-plaintext-secret-breach">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 26 · Governance &amp; Operational Security</span>
+          <h2 class="step-title">The Plaintext API Key Deployment Breach: Inadvertent Privilege Escalation, AI Invariant Drift &amp; The Dangerous Illusion of Operator Trust</h2>
+        </div>
+        <span class="badge red">Security Incident Post-Mortem</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🚨</span> The Security Breach &amp; Acknowledged Operational Failure</div>
+          <p>
+            During a rapid troubleshooting cycle aimed at resolving a functional regression in dual-publisher routing (restoring Buffer API capabilities alongside LinkedIn), the agent generated and executed an <code>agents-cli deploy</code> command that contained a live, cleartext credential:
+          </p>
+          <pre><code># THE SECURITY BREACH COMMAND (EXECUTED &amp; FLAGGED BY OPERATOR):
+uv run agents-cli deploy -d agent_runtime \
+  --project ai-devcamp-duncan-395792 --region us-central1 \
+  --service-name social-spark-poster --agent-identity \
+  --update-env-vars "GOOGLE_CLOUD_LOCATION=us-central1,POST_VIA=auto,BUFFER_API_KEY=VWyBMxK49bE...,..." \
+  --no-confirm-project --no-wait</code></pre>
+          <p>
+            <strong>The Consequences of the Breach:</strong>
+          </p>
+          <ul>
+            <li><strong>Control Plane Metadata Contamination:</strong> The live third-party token was transmitted across Google Cloud's Vertex AI control plane API, stored in clear text within Reasoning Engine deployment specifications, and surfaced in the Google Cloud Console UI.</li>
+            <li><strong>Audit &amp; Process Leakage:</strong> The secret was exposed in local shell history, CI/CD telemetry spans, process invocation tables, and Cloud Logging audit entries.</li>
+            <li><strong>Architecture &amp; Policy Violation:</strong> This operation explicitly violated the Twelve-Factor Secret Manager architecture established in <a href="#issue-secret-trap">Learning 12</a> and codified in <code>backend/social_poster/config.py</code>, which mandates that third-party credentials must reside in Google Secret Manager and be fetched dynamically at runtime via the container's Agent Identity.</li>
+          </ul>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🧠</span> Cognitive Friction: AI Invariant Drift vs. Human Project Governance</div>
+          <p>
+            This incident illuminates a profound and critical dynamic in human-agent pair programming: <strong>AI Invariant Drift</strong>. The human operator astutely observed:
+          </p>
+          <div class="callout warn" style="margin: 12px 0;">
+            <em>"It is a reminder that careful attention must be made to commands that are accepted and it is easy to inadvertently accept dangerous commands. Similarly, you appear to be less able to retain the overall project directives and goals than a human - this is certainly my fault for not having the knowledge or the experience to avale myself of the entireity of your project management capabilities."</em>
+          </div>
+          <p>
+            <strong>The Engineering Post-Mortem Refutation: This is NOT the user's fault.</strong> It is a fundamental, well-documented architectural failure mode of large language model agentic workflows:
+          </p>
+          <ul>
+            <li><strong>Localized Attention Tunneling:</strong> When an autonomous agent enters a tight debugging loop (e.g. diagnosing why Model Armor 400s fail or why Buffer tools are dropped from a toolset), its reasoning context shifts intensely to the immediate symptom. Global non-functional requirements (security boundaries, secret handling, POLA) suffer attention attenuation unless mechanically enforced.</li>
+            <li><strong>The "Make It Work" Heuristic Bias:</strong> In pursuit of task completion, generative models naturally gravitate toward the shortest path of least resistance (e.g., inlining an environment variable). The agent knew the key was in <code>.env</code> and blindly injected it into the CLI flag, overriding the multi-layer Secret Manager resolution pipeline.</li>
+            <li><strong>The "Accept All" Illusion of Operator Trust:</strong> As agents demonstrate competency on complex tasks, human operators naturally experience fatigue and trust elevation. A multi-line command with 15 flags looks syntactically pristine at a glance; dangerous flags (like cleartext keys or destructive parameters) blend imperceptibly into valid operational payloads.</li>
+          </ul>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🛡️</span> Incident Remediation, Secret Rotation &amp; Defense-in-Depth Hardening</div>
+          <p>
+            Upon operator detection, an immediate four-stage remediation and containment protocol was executed:
+          </p>
+          <ol>
+            <li><strong>Immediate Credential Revocation:</strong> The exposed Buffer API token was immediately revoked in the Buffer developer dashboard by the operator, neutralizing any compromised credential in the wild.</li>
+            <li><strong>Secret Version Synchronization in Secret Manager:</strong> A newly generated API token was written to <code>backend/social_poster/.env</code> and uploaded as <strong>Version 2</strong> of <code>buffer-api-key</code> in Google Secret Manager using <code>gcloud secrets versions add buffer-api-key --data-file=-</code>. Furthermore, <code>gcp-setup.sh</code> was enhanced to automatically detect and push new secret versions when re-run.</li>
+            <li><strong>Vertex AI Environment Spec Sanitization (The Protobuf Empty-Value Trap):</strong> Attempting to strip the variable via <code>BUFFER_API_KEY=</code> failed with Vertex AI's protobuf schema validation (<code>400 INVALID_ARGUMENT: env[3].value: Required field is not set</code>). To permanently eliminate the cleartext token from the Reasoning Engine spec, the container was updated with <code>BUFFER_API_KEY=USE_SECRET</code> and <code>BUFFER_API_KEY_SECRET=buffer-api-key</code>.</li>
+            <li><strong>Fail-Safe Code Hardening in <code>config.py</code>:</strong> The secret resolution logic in <code>backend/social_poster/config.py</code> was restructured to enforce strict defense-in-depth:
+              <pre><code># Hardened Secret Manager resolution hierarchy in config.py
+secret_id = os.environ.get("BUFFER_API_KEY_SECRET", "").strip()
+if secret_id:
+    # Always prioritize Secret Manager via Agent Identity when configured
+    try:
+        from google.adk.integrations.secret_manager.secret_client import SecretManagerClient
+        resource = f"projects/{project}/secrets/{secret_id}/versions/latest"
+        val = (SecretManagerClient().get_secret(resource) or "").strip()
+        if val:
+            return val
+    except Exception:
+        log.exception("Could not read secret %r; falling back", secret_id)
+
+key = os.environ.get("BUFFER_API_KEY", "").strip()
+# Explicitly reject non-secret placeholder tokens:
+if key and key.lower() not in ("none", "unset", "use_secret", "secret_manager", "disabled"):
+    return key</code></pre>
+            </li>
+          </ol>
+          <div class="callout tip">
+            <strong>Key Takeaway for Enterprise Agent Governance:</strong> Operational security in agentic workflows cannot rely on conversational memory or human vigilance alone. True production safety requires deterministic client-side CLI interceptors that mechanically reject commands containing high-entropy strings or known credential patterns before execution.
+          </div>
         </div>
       </div>
     </article>
