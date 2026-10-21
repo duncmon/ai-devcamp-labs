@@ -845,6 +845,28 @@ $ curl -s http://localhost:3000/api/backend-status | jq .
             <li><strong>Cloud Deployment Workflow:</strong> Because Vertex AI Reasoning Engine runs the packaged container image uploaded at deploy time, these backend enhancements are packaged for the cloud via <code>uv run agents-cli deploy</code>.</li>
           </ul>
         </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">☁️</span> 11. Cloud Image Diagnostics, ADK Telemetry Privacy Redaction &amp; GCS Bucket Persistence</div>
+          <p>
+            <strong>The Problem:</strong> Forensic analysis of Cloud Console sessions (Session ID <code>151756415931777024</code> on Reasoning Engine <code>1836136314752204800</code>) revealed three critical operational observations:
+          </p>
+          <ul>
+            <li><strong>ADK Telemetry Privacy Redaction (<code>tool_call_args: "{}"</code>):</strong> In Cloud Console Traces, Span 131 and Span 134 for <code>execute_tool generate_image</code> showed empty dictionaries: <code>tool_call_args: "{}"</code> and <code>tool_response: "{}"</code> alongside <code>error.type: "TOOL_ERROR"</code>. Deep code analysis of <code>google/adk/telemetry/tracing.py</code> (lines 213–219) confirmed this is intentional: unless <code>should_add_content_to_legacy_spans</code> is explicitly enabled, ADK suppresses function arguments to avoid leaking sensitive prompt content into OpenTelemetry attributes.</li>
+            <li><strong>The Cloud Logging Search Paradox:</strong> Filtering Cloud Logging on <code>generate_image</code> returned 0 entries. In commit <code>178f4bc</code> (Revision 11, deployed Oct 20), <code>generate_image()</code> lacked Python logging statements, returning uncaught errors directly as dictionaries to ADK without writing to <code>stdout</code> or <code>stderr</code>.</li>
+            <li><strong>The ~140ms Rejection:</strong> Spans completed in 145.83ms and 135.80ms. Because the deployed container had not been updated today (running stale Revision 11 from Oct 20 without <code>IMAGE_MODEL_ID</code>), it defaulted to <code>gemini-3.1-flash-image</code>, which immediately returned <code>404 NOT_FOUND</code> in <code>us-central1</code>.</li>
+            <li><strong>Ephemeral Container Storage &amp; GCS:</strong> On Agent Runtime, containers scale to zero (<code>min_instances: 0</code>). Locally generated images stored in the container's <code>gallery/</code> directory are destroyed when instances terminate and cannot be fetched directly by client browsers.</li>
+          </ul>
+          <p>
+            <strong>The Production Solution:</strong>
+          </p>
+          <ul>
+            <li><strong>Explicit Observability Logging:</strong> Added structured <code>log.info</code>, <code>log.warning</code>, and <code>log.error</code> statements inside <code>generate_image()</code> in <code>tools.py</code>. Filtering on <code>generate_image</code> in Cloud Logging now immediately surfaces every attempted model candidate and diagnostic result.</li>
+            <li><strong>Automatic GCS Bucket Mirroring:</strong> Integrated project Cloud Storage (<code>lab2-bucket-ai-devcamp-duncan-395792</code>) directly into <code>generate_image()</code>. Upon successful creation of the local PNG asset, the image is mirrored to GCS, and the signed/public URL is returned in <code>image_url</code>.</li>
+            <li><strong>Automatic State Registration in <code>_track_image_state</code>:</strong> When <code>generate_image</code> returns <code>image_url</code>, the callback populates <code>current_image_url</code> and <code>current_image_display_url</code> immediately in session state.</li>
+            <li><strong>Continuous Container Deployment:</strong> Executed <code>agents-cli deploy -d agent_runtime --service-name social-spark-poster</code> to build and deploy a fresh revision containing the cascading image fallback, GCS mirroring, and role-based models.</li>
+          </ul>
+        </div>
       </div>
     </article>
 
@@ -989,6 +1011,14 @@ $ curl -s http://localhost:3000/api/backend-status | jq .
             <strong>Figure 16 — Cloud Execution Lifecycle with All Stages Posted:</strong> Full end-to-end execution of Social Spark on Vertex AI Agent Runtime (Session <code>151756415931777024</code>). The orchestrator coordinated <code>research_agent</code> and <code>draft_agent</code>, posted the content across all configured stages, and displayed the final output in the dashboard. The missing image card directly confirmed the stale container code issue, pinpointing the need for the multi-tiered cascading fallback and redeployment workflow.
           </figcaption>
         </figure>
+
+        <!-- Figure 17 -->
+        <figure class="evidence-figure">
+          <img src="../screenshots/lab1-step8-cloud-console-revisions.png" alt="Agent Runtime Revisions Dashboard in Cloud Console" loading="lazy">
+          <figcaption>
+            <strong>Figure 17 — Agent Platform Revisions Console:</strong> Verification in Google Cloud Console showing Revision 11 active with 100% traffic, deployed on 20 Oct 2026. This authentic evidence established that earlier cloud execution tests targeted container code prior to our cascading fallback and GCS persistence improvements, initiating the redeployment workflow.
+          </figcaption>
+        </figure>
       </div>
     </article>
 
@@ -1071,15 +1101,15 @@ $ curl -s http://localhost:3000/api/backend-status | jq .
               <td><span class="badge green">PASS</span></td>
             </tr>
             <tr>
-              <td><strong>Model Fallback Test Suite</strong></td>
-              <td><code>uv run pytest tests/test_model_fallback.py</code></td>
-              <td>4 passed (404 interception, non-404 preservation, role tiering, image cascade)</td>
+              <td><strong>GCS Image Persistence</strong></td>
+              <td><code>uv run pytest tests/test_tools.py -k gcs</code></td>
+              <td>Auto-persists generated PNG to GCS bucket when configured</td>
               <td><span class="badge green">PASS</span></td>
             </tr>
             <tr>
               <td><strong>Full Test Suite Regression</strong></td>
               <td><code>uv run pytest</code></td>
-              <td>17 passed (db, tools, and fallback resilience suites)</td>
+              <td>18 passed (db, tools, GCS persistence, fallback resilience suites)</td>
               <td><span class="badge green">PASS</span></td>
             </tr>
             <tr>
