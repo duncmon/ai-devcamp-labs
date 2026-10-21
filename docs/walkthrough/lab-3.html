@@ -174,6 +174,15 @@ curl -s -X POST \
                   <strong>The Red Organization Policy Banner:</strong> The red warning banner displayed in the Console relates to organization-level risk posture and floor policy enablement across the Google Cloud Organization, not local template execution failures.
                 </li>
               </ul>
+              <p><strong>3. Deliberate Error 1: Gemini on the Global Location (400 TEMPLATE_NOT_FOUND):</strong></p>
+              <ul>
+                <li>
+                  <strong>The Failure Mechanism:</strong> When Gemini calls are executed against <code>locations/global</code> while carrying a <code>model_armor_config</code> pointing to a regional template (<code>locations/us-central1/templates/devcamp-guardrails</code>), Vertex AI immediately throws <code>400 INVALID_ARGUMENT: The template named '...' was not found (reason: TEMPLATE_NOT_FOUND)</code>. Model Armor templates are strictly regional resources and cannot be bound to global endpoints. Furthermore, when retried by ADK's <code>RETRY_CONFIG</code> across 6 exponential attempts, this error triggers client-side timeouts in frontends like CopilotKit.
+                </li>
+                <li>
+                  <strong>Defensive Self-Healing:</strong> In <code>backend/social_poster/guardrails.py</code>, we implemented automatic location normalization: if <code>MODEL_ARMOR_TEMPLATE_ID</code> is active and <code>GOOGLE_CLOUD_LOCATION</code> is <code>global</code> or unset, the runtime automatically overrides location to <code>us-central1</code>, preventing silent unhandled crashes and retry loops.
+                </li>
+              </ul>
             </div>
           </div>
         </div>

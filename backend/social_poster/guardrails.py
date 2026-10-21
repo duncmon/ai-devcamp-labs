@@ -55,6 +55,14 @@ PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
 # parent field"), but inside Agent Runtime GOOGLE_CLOUD_PROJECT is the number.
 # Set PROJECT_ID on the deployment (gcp-setup.sh prints the flag).
 DLP_PROJECT = os.environ.get("PROJECT_ID") or PROJECT  # also used for the Model Armor template path
+if not DLP_PROJECT or DLP_PROJECT.isdigit():
+    try:
+        import google.auth
+        _, adc_project = google.auth.default()
+        if adc_project and not adc_project.isdigit():
+            DLP_PROJECT = adc_project
+    except Exception:
+        pass
 # Where the TEMPLATE lives. Use the same region as the Agent Gateway and Gemini
 # (us-central1); `global` templates cannot be created.
 MA_REGION = os.environ.get("MODEL_ARMOR_REGION", "us-central1")
@@ -63,6 +71,22 @@ MA_REGION = os.environ.get("MODEL_ARMOR_REGION", "us-central1")
 MA_TEMPLATE = os.environ.get("MODEL_ARMOR_TEMPLATE_ID", "")
 if MA_TEMPLATE.strip().lower() in ("off", "none", "disabled"):
     MA_TEMPLATE = ""
+
+# Model Armor requires the Gemini call to target the REGIONAL endpoint matching the
+# template (us-central1). If GOOGLE_CLOUD_LOCATION is "global" (which agents-cli deploy
+# injects by default), Vertex AI rejects the call with 400 TEMPLATE_NOT_FOUND.
+# Defensive self-healing: enforce regional location whenever Model Armor is active.
+if MA_TEMPLATE and os.environ.get("GOOGLE_CLOUD_LOCATION", "").strip() in ("global", ""):
+    log.warning(
+        "Model Armor requires a regional location matching the template (%s). "
+        "Overriding GOOGLE_CLOUD_LOCATION from %r to %r to prevent 400 TEMPLATE_NOT_FOUND.",
+        MA_REGION,
+        os.environ.get("GOOGLE_CLOUD_LOCATION"),
+        MA_REGION,
+    )
+    os.environ["GOOGLE_CLOUD_LOCATION"] = MA_REGION
+    os.environ["VERTEX_LOCATION"] = MA_REGION
+
 # Responses get a second template WITHOUT the prompt-injection filter: that
 # filter fires on a model reply that merely DISCUSSES injection (this user's
 # signature topic), so outputs are screened on the responsible-AI filters only.
