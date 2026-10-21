@@ -36,8 +36,9 @@ def generate_image(prompt: str) -> dict:
     if configured_model and configured_model.strip():
         candidate_models.append(configured_model.strip())
     
-    # Priority cascade: Gemini 3.5 -> Gemini 3.1 -> Imagen 3.0 -> Gemini 2.5
+    # Priority cascade: Gemini 3.8 -> Gemini 3.5 -> Gemini 3.1 -> Imagen 3.0 -> Gemini 2.5
     for fallback in [
+        "gemini-3.8-flash-image",
         "gemini-3.5-flash-image",
         "gemini-3.1-flash-image",
         "imagen-3.0-generate-002",
@@ -46,7 +47,12 @@ def generate_image(prompt: str) -> dict:
         if fallback not in candidate_models:
             candidate_models.append(fallback)
 
-    client = genai.Client()  # picks up GOOGLE_GENAI_USE_VERTEXAI / project / location
+    # Client location: allow explicit override via IMAGE_MODEL_LOCATION or VERTEX_LOCATION
+    location = os.environ.get("IMAGE_MODEL_LOCATION") or os.environ.get("VERTEX_LOCATION")
+    client_kwargs = {}
+    if location and location.strip():
+        client_kwargs["location"] = location.strip()
+    client = genai.Client(**client_kwargs)  # picks up GOOGLE_GENAI_USE_VERTEXAI / project / location
     last_error = None
 
     for model in candidate_models:
@@ -59,15 +65,23 @@ def generate_image(prompt: str) -> dict:
                 ),
             )
             if not response.candidates:
+                last_error = "Model returned no candidates"
                 continue
 
-            for part in response.candidates[0].content.parts:
-                if part.inline_data and part.inline_data.mime_type.startswith("image/"):
+            parts = getattr(response.candidates[0].content, "parts", []) or []
+            has_image = False
+            for part in parts:
+                if getattr(part, "inline_data", None) and getattr(part.inline_data, "mime_type", "").startswith("image/"):
+                    has_image = True
                     OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
                     ext = part.inline_data.mime_type.split("/")[-1]
                     path = OUTPUTS_DIR / f"post-image-{int(time.time())}-{uuid.uuid4().hex[:8]}.{ext}"
                     path.write_bytes(part.inline_data.data)
                     return {"status": "success", "image_path": str(path), "model_used": model}
+
+            if not has_image:
+                last_error = "Model response contained no image data"
+                continue
         except Exception as e:
             err_str = str(e)
             last_error = err_str
@@ -77,7 +91,7 @@ def generate_image(prompt: str) -> dict:
             # For other errors (e.g. safety filter, 429), return immediately
             return {"status": "error", "error": err_str}
 
-    return {"status": "error", "error": f"All image candidate models failed. Last error: {last_error}"}
+    return {"status": "error", "error": last_error or f"All image candidate models failed: {candidate_models}"}
 
 
 SIGNED_URL_EXPIRY_HOURS = int(os.environ.get("SIGNED_URL_EXPIRY_HOURS", "168"))  # 7 days, V4's max

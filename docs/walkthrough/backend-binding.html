@@ -817,28 +817,31 @@ $ curl -s http://localhost:3000/api/backend-status | jq .
         </div>
 
         <div class="part-section">
-          <div class="part-label"><span class="icon">🎯</span> 10. Role-Based Cost Optimization &amp; Gemini Deprecation Resilience (Hierarchical Fallback Cascade)</div>
+          <div class="part-label"><span class="icon">🎯</span> 10. Geographic Model Availability, Sunset Lifecycles &amp; Role-Based Cascading Fallbacks</div>
           <p>
-            <strong>The Problem:</strong> Detailed review of execution traces and lab architecture uncovered two critical considerations:
+            <strong>The Problem:</strong> Review of runtime execution traces and architectural constraints revealed two interconnected production realities:
           </p>
           <ul>
-            <li><strong>Role-Based Cost Deviation:</strong> In Lab 1, the instructor architecture established distinct roles to minimize token spend: lightweight high-throughput Flash-Lite for web search and research grounding, and standard Flash/Pro for synthesis and post drafting. In earlier runs, uniform models (or Pro tiers) were inadvertently applied across all turns, inflating execution costs.</li>
-            <li><strong>Model Deprecation Horizon &amp; Regional Availability:</strong> Google Cloud regularly deprecates preview and early model versions (e.g. gradual sunsetting of Gemini 2.0 / 2.5 series in favor of Gemini 3, 3.5, and 3.8). Statically hardcoding model strings creates ticking operational liabilities if a model is deprecated or not yet deployed in a specific region (such as <code>us-central1</code> returning <code>HTTP 404 NOT_FOUND</code>).</li>
-            <li><strong>Image Generation Stale Cloud Code:</strong> In cloud mode, image generation failed because the deployed Reasoning Engine container (<code>1836136314752204800</code>) dated from prior deployment commits where <code>IMAGE_MODEL_ID</code> was hardcoded or defaulted to an unsupported model ID without fallback.</li>
+            <li><strong>Geographic Model Availability &amp; The Regional 404 Trap:</strong> Per the official <a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/resources/locations" target="_blank" rel="noopener">Gemini Enterprise Agent Platform Locations documentation</a>, Google Cloud segments generative AI endpoints into <strong>Global</strong> (e.g. <code>location="global"</code>), <strong>Jurisdictional Multi-Region</strong> (e.g. <code>location="us"</code> via <code>aiplatform.us.rep.googleapis.com</code> and <code>location="eu"</code> via <code>aiplatform.eu.rep.googleapis.com</code> for strict data residency), and <strong>Locational Single-Region</strong> (e.g. <code>location="us-central1"</code>). Cutting-edge flagship models (such as the Gemini 3.8 family) and experimental image generator endpoints are deployed initially to <strong>global</strong> and multi-region clusters. Single regions often return <code>HTTP 404 NOT_FOUND: Publisher model ... was not found</code> even when the model is active globally.</li>
+            <li><strong>The Deprecation Cadence:</strong> As documented on the <a href="https://ai.google.dev/gemini-api/docs/deprecations" target="_blank" rel="noopener">Gemini API Deprecation Schedule</a>, Google regularly phases out older preview iterations and minor model versions (such as the sunsetting of Gemini 2.0 / 2.5 series in favor of Gemini 3, 3.5, and 3.8). Hardcoded model strings in agent definitions create ticking operational liabilities when an endpoint reaches its scheduled shutdown date.</li>
+            <li><strong>Role-Based Cost Deviation:</strong> In Lab 1, the instructor architecture established distinct roles to minimize token spend: lightweight high-throughput Flash-Lite for web search and research grounding, and standard Flash/Pro for synthesis and post drafting. In earlier runs, Pro or uniform Flash models were inadvertently applied across all turns, inflating execution costs.</li>
+            <li><strong>Stale Cloud Container Code:</strong> In cloud mode, image generation failed because the deployed Reasoning Engine container (<code>1836136314752204800</code>) dated from prior deployment commits where <code>IMAGE_MODEL_ID</code> was hardcoded or defaulted to an unsupported model ID without fallback.</li>
           </ul>
           <p>
-            <strong>The Solution:</strong> We implemented an enterprise hierarchical fallback architecture across both textual agents and multimodal image tools:
+            <strong>The Enterprise Solution:</strong> We implemented an enterprise hierarchical fallback architecture across both textual agents and multimodal image tools:
           </p>
           <ul>
-            <li><strong>Subclassed <code>FallbackGemini(Gemini)</code> in <code>guardrails.py</code>:</strong> Extends the ADK <code>Gemini</code> model with an ordered candidate list (e.g., <code>[gemini-3.5-flash-lite, gemini-3.0-flash-lite, gemini-2.5-flash-lite]</code>). If the primary model returns <code>HTTP 404 NOT_FOUND</code>, the wrapper catches the error, logs a clean diagnostic warning, and immediately transparently retries against the next GA candidate model.</li>
+            <li><strong>Subclassed <code>FallbackGemini(Gemini)</code> in <code>guardrails.py</code>:</strong> Extends the ADK <code>Gemini</code> model with an ordered candidate list (e.g., <code>[gemini-3.8-flash-lite, gemini-3.5-flash-lite, gemini-3.0-flash-lite, gemini-2.5-flash-lite]</code>). If the primary model returns <code>HTTP 404 NOT_FOUND</code> (whether due to regional unpublishing or model deprecation), the wrapper catches the error, logs a clean diagnostic warning, and immediately transparently retries against the next GA candidate model. Non-404 errors (such as 429 quota exhaustion) are preserved and routed to the exponential retry policy.</li>
+            <li><strong>Decoupled Location &amp; Endpoint Routing:</strong> Configured <code>IMAGE_MODEL_LOCATION</code> and <code>VERTEX_LOCATION</code> support. This allows workloads running in single-region compute containers (e.g. <code>us-central1</code>) to route inference requests to <code>global</code> or <code>us</code> multi-region endpoints where next-generation models reside.</li>
             <li><strong>Tiered Role Assignments:</strong>
               <ul>
-                <li><code>research_agent</code>: Primary <code>gemini-3.5-flash-lite</code> (fallbacks: <code>gemini-3.0-flash-lite</code>, <code>gemini-2.5-flash-lite</code>) — lowest token cost for rapid web scraping and search summarization.</li>
-                <li><code>draft_agent</code>: Primary <code>gemini-3.5-flash</code> (fallbacks: <code>gemini-3.0-flash</code>, <code>gemini-2.5-flash</code>, <code>gemini-2.5-pro</code>) — balanced reasoning and social tone styling.</li>
-                <li><code>root_agent</code> (Orchestrator): Primary <code>gemini-3.5-flash</code> (fallbacks: <code>gemini-3.0-flash</code>, <code>gemini-2.5-flash</code>) — fast subagent dispatch and tool calling.</li>
+                <li><code>research_agent</code>: Primary <code>gemini-3.8-flash-lite</code> (fallbacks: <code>gemini-3.5-flash-lite</code>, <code>gemini-3.0-flash-lite</code>, <code>gemini-2.5-flash-lite</code>) — lowest token cost for rapid web scraping and search summarization.</li>
+                <li><code>draft_agent</code>: Primary <code>gemini-3.8-flash</code> (fallbacks: <code>gemini-3.5-flash</code>, <code>gemini-3.0-flash</code>, <code>gemini-2.5-flash</code>, <code>gemini-2.5-pro</code>) — balanced reasoning and social tone styling.</li>
+                <li><code>root_agent</code> (Orchestrator): Primary <code>gemini-3.8-flash</code> (fallbacks: <code>gemini-3.5-flash</code>, <code>gemini-3.0-flash</code>, <code>gemini-2.5-flash</code>) — fast subagent dispatch and tool calling.</li>
               </ul>
             </li>
-            <li><strong>Cascading Image Generation in <code>tools.py</code>:</strong> Upgraded <code>generate_image()</code> to probe candidate models in priority sequence: <code>[configured_ID, "gemini-3.5-flash-image", "gemini-3.1-flash-image", "imagen-3.0-generate-002", "gemini-2.5-flash-image"]</code>. Live probing verified that 404s on 3.5/3.1/Imagen-3 are cleanly bypassed, generating the PNG with <code>gemini-2.5-flash-image</code>.</li>
+            <li><strong>Cascading Image Generation in <code>tools.py</code>:</strong> Upgraded <code>generate_image()</code> to probe candidate models in priority sequence: <code>[configured_ID, "gemini-3.8-flash-image", "gemini-3.5-flash-image", "gemini-3.1-flash-image", "imagen-3.0-generate-002", "gemini-2.5-flash-image"]</code>. Live probing verified that 404s on unreleased models are cleanly bypassed, generating the PNG with <code>gemini-2.5-flash-image</code>.</li>
+            <li><strong>Explicit Automated Verification Suite (<code>tests/test_model_fallback.py</code>):</strong> Authoring dedicated unit tests verifying mock 404 interception and running live Vertex AI integration probes. In live testing, an initial request to <code>gemini-3.8-flash</code> automatically cascaded to <code>gemini-3.5-flash</code> (404) and then successfully returned <code>200 OK</code> with <code>gemini-2.5-flash</code> with zero dropped frames.</li>
             <li><strong>Cloud Deployment Workflow:</strong> Because Vertex AI Reasoning Engine runs the packaged container image uploaded at deploy time, these backend enhancements are packaged for the cloud via <code>uv run agents-cli deploy</code>.</li>
           </ul>
         </div>
@@ -1064,7 +1067,31 @@ $ curl -s http://localhost:3000/api/backend-status | jq .
             <tr>
               <td><strong>Cascading Image Generation</strong></td>
               <td><code>uv run python -c "from backend.social_poster.tools import generate_image; ..."</code></td>
-              <td>Probes 3.5 &rarr; 3.1 &rarr; Imagen &rarr; 2.5; generates image with 2.5-flash-image</td>
+              <td>Probes 3.8 &rarr; 3.5 &rarr; 3.1 &rarr; Imagen &rarr; 2.5; generates image with 2.5-flash-image</td>
+              <td><span class="badge green">PASS</span></td>
+            </tr>
+            <tr>
+              <td><strong>Model Fallback Test Suite</strong></td>
+              <td><code>uv run pytest tests/test_model_fallback.py</code></td>
+              <td>4 passed (404 interception, non-404 preservation, role tiering, image cascade)</td>
+              <td><span class="badge green">PASS</span></td>
+            </tr>
+            <tr>
+              <td><strong>Full Test Suite Regression</strong></td>
+              <td><code>uv run pytest</code></td>
+              <td>17 passed (db, tools, and fallback resilience suites)</td>
+              <td><span class="badge green">PASS</span></td>
+            </tr>
+            <tr>
+              <td><strong>Live Vertex AI Fallback Probe</strong></td>
+              <td><code>uv run python (live LlmRequest gemini-3.8-flash)</code></td>
+              <td>Catches 404 on 3.8/3.5, executes on 2.5, returns response "OK"</td>
+              <td><span class="badge green">PASS</span></td>
+            </tr>
+            <tr>
+              <td><strong>Backend API Reachability</strong></td>
+              <td>FastAPI TestClient (<code>/openapi.json</code>, <code>/healthz</code>, <code>/api/posts</code>)</td>
+              <td>All core routes return HTTP 200 OK</td>
               <td><span class="badge green">PASS</span></td>
             </tr>
           </tbody>

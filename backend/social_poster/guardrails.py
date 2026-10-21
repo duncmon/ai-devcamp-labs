@@ -174,17 +174,19 @@ def model(name: str):
     """The model for an agent, wrapped in FallbackGemini with cascading model support and retries.
     
     Protects against model deprecation/removal (Gemini 2.5) and premature model unavailability
-    (Gemini 3.5), with role-based fallbacks to reduce execution costs."""
-    fallbacks = []
-    if "flash-lite" in name.lower():
+    (Gemini 3.8/3.5), with role-based fallbacks to reduce execution costs."""
+    custom_fallbacks = os.environ.get("MODEL_FALLBACKS")
+    if custom_fallbacks and custom_fallbacks.strip():
+        fallbacks = [m.strip() for m in custom_fallbacks.split(",") if m.strip()]
+    elif "flash-lite" in name.lower():
         # Research role: keep costs lowest
-        fallbacks = ["gemini-3.5-flash-lite", "gemini-3.0-flash-lite", "gemini-2.5-flash-lite"]
+        fallbacks = ["gemini-3.8-flash-lite", "gemini-3.5-flash-lite", "gemini-3.0-flash-lite", "gemini-2.5-flash-lite"]
     elif "pro" in name.lower():
         # High reasoning role
-        fallbacks = ["gemini-3.5-pro", "gemini-3.1-pro-preview", "gemini-2.5-pro", "gemini-2.5-flash"]
+        fallbacks = ["gemini-3.8-pro", "gemini-3.5-pro", "gemini-3.1-pro-preview", "gemini-2.5-pro", "gemini-2.5-flash"]
     else:
         # Default/Orchestrator/Draft role
-        fallbacks = ["gemini-3.5-flash", "gemini-3.0-flash", "gemini-2.5-flash"]
+        fallbacks = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.0-flash", "gemini-2.5-flash"]
 
     return FallbackGemini(
         model=name,
