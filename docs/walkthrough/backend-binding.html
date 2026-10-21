@@ -864,7 +864,7 @@ $ curl -s http://localhost:3000/api/backend-status | jq .
             <li><strong>Explicit Observability Logging:</strong> Added structured <code>log.info</code>, <code>log.warning</code>, and <code>log.error</code> statements inside <code>generate_image()</code> in <code>tools.py</code>. Filtering on <code>generate_image</code> in Cloud Logging now immediately surfaces every attempted model candidate and diagnostic result.</li>
             <li><strong>Automatic GCS Bucket Mirroring:</strong> Integrated project Cloud Storage (<code>lab2-bucket-ai-devcamp-duncan-395792</code>) directly into <code>generate_image()</code>. Upon successful creation of the local PNG asset, the image is mirrored to GCS, and the signed/public URL is returned in <code>image_url</code>.</li>
             <li><strong>Automatic State Registration in <code>_track_image_state</code>:</strong> When <code>generate_image</code> returns <code>image_url</code>, the callback populates <code>current_image_url</code> and <code>current_image_display_url</code> immediately in session state.</li>
-            <li><strong>Continuous Container Deployment:</strong> Executed <code>agents-cli deploy -d agent_runtime --service-name social-spark-poster</code> to build and deploy a fresh revision containing the cascading image fallback, GCS mirroring, and role-based models.</li>
+            <li><strong>Continuous Container Deployment:</strong> Executed <code>agents-cli deploy -d agent_runtime --service-name social-spark-poster</code>, successfully promoting a fresh container revision on 21 Oct 2026 (Operation <code>1841252149082718208</code>) with 100% traffic, resolving the stale container issue.</li>
           </ul>
         </div>
       </div>
@@ -1122,6 +1122,12 @@ $ curl -s http://localhost:3000/api/backend-status | jq .
               <td><strong>Backend API Reachability</strong></td>
               <td>FastAPI TestClient (<code>/openapi.json</code>, <code>/healthz</code>, <code>/api/posts</code>)</td>
               <td>All core routes return HTTP 200 OK</td>
+              <td><span class="badge green">PASS</span></td>
+            </tr>
+            <tr>
+              <td><strong>Agent Runtime Cloud Redeploy</strong></td>
+              <td><code>agents-cli deploy -d agent_runtime</code></td>
+              <td>Revision successfully updated and serving 100% traffic (Operation 1841252149082718208)</td>
               <td><span class="badge green">PASS</span></td>
             </tr>
           </tbody>
