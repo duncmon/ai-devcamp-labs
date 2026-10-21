@@ -84,6 +84,8 @@
               <li><a href="#issue-frontend-auth">11. Frontend ADC Streaming Proxy Architecture</a></li>
               <li><a href="#issue-secret-trap">12. Secret Manager in Containerized Agent Runtime</a></li>
               <li><a href="#issue-buffer-delay">13. Buffer Review Delay Safeguard</a></li>
+              <li><a href="#issue-badge-flapping">22. Observability Badge Flapping &amp; Latency Hysteresis</a></li>
+              <li><a href="#issue-429-backoff">23. 429 RESOURCE_EXHAUSTED &amp; ADK Exponential Backoff</a></li>
             </ul>
           </div>
           <div>
@@ -783,6 +785,64 @@ node_modules/
           <p>
             This reduced the payload from over 11MB to under <strong>50KB</strong>, ensuring instant deployments.
           </p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-badge-flapping">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 22 · Scale</span>
+          <h2 class="step-title">Observability Badge Flapping &amp; Latency Hysteresis (<code>BackendStatusBadge.tsx</code>)</h2>
+        </div>
+        <span class="badge yellow">Observability</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> Symptom &amp; Root Cause</div>
+          <p>
+            When testing Social Spark with <code>./run-frontend.sh --cloud</code>, attendees observed the dashboard header badge intermittently flipping to <code>⚠ Unreachable</code> in red during active prompt generation (captured at second 34 of screen recording <code>Enregistrement de l’écran 2026-10-21 à 11.04.03.mov</code>), before flipping back to blue <code>☁ Vertex AI</code> 10 seconds later.
+          </p>
+          <p>
+            <strong>The Latency Anti-Pattern:</strong> Terminal traces showed baseline health probes succeeding in 837ms–1578ms. However, when an attendee submits a prompt, the remote Reasoning Engine container is actively saturated generating LLM tokens and orchestrating subagent tools. Background health probes queued behind active requests or took slightly longer than the aggressive 4000ms <code>AbortSignal.timeout</code>. Because <code>BackendStatusBadge.tsx</code> had zero hysteresis, a single delayed probe immediately triggered an alarming panic transition to red.
+          </p>
+          <p>
+            <strong>The Solution:</strong> Implemented Google SRE consecutive failure thresholds:
+          </p>
+          <ul>
+            <li><strong>Adaptive Cloud Timeout:</strong> In <code>frontend/app/api/backend-status/route.ts</code>, set cloud probe timeouts to 8000ms while keeping local loopback at 2500ms.</li>
+            <li><strong>Consecutive Failure Threshold (Hysteresis = 2):</strong> In <code>frontend/app/components/BackendStatusBadge.tsx</code>, required 2 consecutive failed probes before declaring the backend unreachable. A single delay enters a graceful <code>Vertex AI (cloud:busy…)</code> state with a pulsing dot.</li>
+            <li><strong>Polling Cadence:</strong> Relaxed background polling from 10s to 15s, eliminating socket contention with active CopilotKit SSE streams.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step-card" id="issue-429-backoff">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 23 · Scale</span>
+          <h2 class="step-title">Vertex AI 429 RESOURCE_EXHAUSTED &amp; ADK Exponential Backoff with Jitter</h2>
+        </div>
+        <span class="badge red">Rate Limiting</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> Symptom &amp; Root Cause</div>
+          <p>
+            Submitting multi-agent requests against the deployed Reasoning Engine resulted in a fatal turn crash with a raw CopilotKit error modal:
+          </p>
+          <pre><code>[CopilotKit] Agent error: "\nOn how to mitigate this issue, please refer to:\nhttps://google.github.io/adk-docs/agents/models/google-gemini/#error-code-429-resource_exhausted\n\n429 RESOURCE_EXHAUSTED."</code></pre>
+          <p>
+            Cloud Console logs in <code>social-spark-poster</code> confirmed that <code>google/adk/models/google_llm.py</code> threw <code>_ResourceExhaustedError</code> during <code>generate_content_async</code>. Multi-agent workflows (orchestrator, researcher, and drafter) generate rapid sequential LLM calls that can hit transient shared capacity caps on Vertex AI regional infrastructure in <code>us-central1</code>, even when project billing and quotas are within limits. Because the deployed container had bare model strings with no retry policy, the first 429 killed the turn.
+          </p>
+          <p>
+            <strong>The Architectural Solution:</strong>
+          </p>
+          <ul>
+            <li><strong>ADK Model &amp; Config Retries:</strong> In <code>backend/social_poster/guardrails.py</code>, attached <code>genai_types.HttpRetryOptions(attempts=6, initial_delay=1.5, max_delay=32.0, exp_base=2.0, jitter=0.5, http_status_codes=[400, 408, 429, 500, 502, 503, 504])</code> to all <code>Gemini</code> models and <code>GenerateContentConfig(http_options=...)</code> configs across <code>root_agent</code>, <code>research_agent</code>, and <code>draft_agent</code>.</li>
+            <li><strong>Fail-Closed Gateway SSE Stream Transformation:</strong> In <code>frontend/app/api/adk/route.ts</code>, added an in-stream <code>TransformStream</code> intercepting <code>agent_run_error_event</code>. If retries are exhausted, the proxy transforms the raw error into a clean Markdown assistant message explaining regional capacity and backoff steps, preventing raw React overlay crashes.</li>
+          </ul>
         </div>
       </div>
     </article>
