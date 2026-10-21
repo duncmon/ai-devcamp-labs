@@ -498,18 +498,19 @@ def _delay_buffer_post(
     if (
         tool.name == "create_post"
         and args.get("channelId")  # Buffer-only field; LinkedIn's local server has none
-        and BUFFER_REVIEW_DELAY_MINUTES > 0
     ):
-        due = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
-            minutes=BUFFER_REVIEW_DELAY_MINUTES
-        )
-        args["mode"] = "customScheduled"
-        args["dueAt"] = due.strftime("%Y-%m-%dT%H:%M:%S+00:00")
-        log.info(
-            "Buffer post delayed to %s (BUFFER_REVIEW_DELAY_MINUTES=%d) for review",
-            args["dueAt"],
-            BUFFER_REVIEW_DELAY_MINUTES,
-        )
+        args.setdefault("schedulingType", "automatic")
+        if BUFFER_REVIEW_DELAY_MINUTES > 0:
+            due = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+                minutes=BUFFER_REVIEW_DELAY_MINUTES
+            )
+            args["mode"] = "customScheduled"
+            args["dueAt"] = due.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+            log.info(
+                "Buffer post delayed to %s (BUFFER_REVIEW_DELAY_MINUTES=%d) for review",
+                args["dueAt"],
+                BUFFER_REVIEW_DELAY_MINUTES,
+            )
     return None
 
 # --- Pipeline stage, surfaced to the frontend via AG-UI shared state ----------
@@ -661,23 +662,24 @@ _BUFFER_CHANNEL_LOOKUP = """
     1. Call get_account (no arguments). Read organizations[0].id — almost
        every account has exactly one organization; only ask the user if
        there is genuinely more than one.
-    2. Call list_channels with that organizationId. Match the channel whose
-       "service" field is the platform the user asked for (linkedin,
-       twitter for X, facebook, instagram, ...).
-    3. If exactly one channel matches that service, use its id as channelId
-       directly — do not ask the user which account, and never ask for an
-       organization name; you already have it from step 1. Only ask the
-       user to pick if more than one channel matches the same service."""
+    2. Call list_channels with that organizationId. If the user specified a
+       platform (linkedin, twitter for X, facebook, instagram, ...), match
+       the channel whose "service" matches. If the user simply asked to post
+       via Buffer or didn't specify a service, select the first available channel.
+    3. If exactly one channel matches, use its id as channelId directly — do
+       not ask the user which account, and never ask for an organization name;
+       you already have it from steps 1 and 2. Only ask the user to pick if more
+       than one channel matches the same requested service."""
 
 if use_linkedin and use_buffer:
     _BUFFER_ROUTING = f"""
 
-Two ways to publish, choose based on what the user wants:
-- LinkedIn tool (linkedin_create_post): an immediate post to LinkedIn only, right now.
-  Can include a generated image (pass the local image_path).
-- Buffer tools (create_post, list_channels, get_account): use these instead if the user
-  wants to SCHEDULE a post for later, or wants to post to a platform OTHER than LinkedIn
-  (X, Facebook, etc.) that they've connected in Buffer.{_BUFFER_CHANNEL_LOOKUP}{_BUFFER_IMAGE_NOTE}
+Two ways to publish (POST_VIA=auto routes indifferently based on user intent):
+- LinkedIn direct tool (linkedin_create_post): an immediate post directly to LinkedIn.
+  Can include a generated image (pass the local image_path as image_path).
+- Buffer tools (create_post, list_channels, get_account): use these when the user
+  asks to post or publish via Buffer, asks to SCHEDULE a post for later, or asks to
+  post to any channel connected in Buffer (LinkedIn via Buffer, X, Facebook, etc.).{_BUFFER_CHANNEL_LOOKUP}{_BUFFER_IMAGE_NOTE}
 """
 elif use_buffer:
     _BUFFER_ROUTING = f"""

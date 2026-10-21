@@ -54,36 +54,30 @@ def resolve_buffer_key() -> str:
     import that raises kills the container before it can log why — which on
     Agent Runtime is indistinguishable from a platform-level deploy rejection.
     """
+    secret_id = os.environ.get("BUFFER_API_KEY_SECRET", "").strip()
+    # Deployed: when Secret Manager secret is specified, always fetch from Secret Manager
+    if secret_id:
+        project = resolve_project()
+        if not project:
+            log.warning("No project for secret lookup; Buffer will be unavailable")
+            return ""
+        try:
+            from google.adk.integrations.secret_manager.secret_client import (
+                SecretManagerClient,
+            )
+
+            resource = f"projects/{project}/secrets/{secret_id}/versions/latest"
+            val = (SecretManagerClient().get_secret(resource) or "").strip()
+            if val:
+                return val
+        except Exception:  # noqa: BLE001 — never let a secret lookup break startup
+            log.exception("Could not read secret %r; falling back to env var", secret_id)
+
     key = os.environ.get("BUFFER_API_KEY", "").strip()
-    if key:
+    if key and key.lower() not in ("none", "unset", "use_secret", "secret_manager", "disabled"):
         return key
 
-    secret_id = os.environ.get("BUFFER_API_KEY_SECRET", "").strip()
-    if not secret_id:
-        return ""
-
-    project = resolve_project()
-    if not project:
-        log.warning("No project for secret lookup; Buffer will be unavailable")
-        return ""
-
-    # ADK ships a client for exactly this, and it is the documented path
-    # (secret-manager/docs/integrate-secret-manager-with-adk): grant the agent
-    # identity roles/secretmanager.secretAccessor and read at runtime. A
-    # hand-rolled REST call with a bearer token from google.auth.default()
-    # returns HTTP 401 inside an Agent Runtime container even with that grant
-    # in place — the gRPC client handles the Agent Identity credential
-    # correctly where a raw Authorization header does not.
-    try:
-        from google.adk.integrations.secret_manager.secret_client import (
-            SecretManagerClient,
-        )
-
-        resource = f"projects/{project}/secrets/{secret_id}/versions/latest"
-        return (SecretManagerClient().get_secret(resource) or "").strip()
-    except Exception:  # noqa: BLE001 — never let a secret lookup break startup
-        log.exception("Could not read secret %r; Buffer will be unavailable", secret_id)
-        return ""
+    return ""
 
 
 def resolve_agent_engine() -> dict[str, str] | None:

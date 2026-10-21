@@ -249,7 +249,16 @@ BUFFER_SECRET_ID="buffer-api-key"
 if ! [[ -f "$ENV_FILE" ]]; then
   echo "No $ENV_FILE yet — skipping (create it, then re-run)."
 elif gcloud secrets describe "$BUFFER_SECRET_ID" --project="$GOOGLE_CLOUD_PROJECT" >/dev/null 2>&1; then
-  echo "Secret $BUFFER_SECRET_ID already exists, skipping create."
+  buffer_key="$(grep -m1 "^BUFFER_API_KEY=" "$ENV_FILE" | cut -d= -f2- | tr -d "\r\n\"'" || true)"
+  if [[ -n "$buffer_key" ]]; then
+    # Add new version if key in .env differs or is updated
+    printf %s "$buffer_key" | gcloud secrets versions add "$BUFFER_SECRET_ID" \
+      --project="$GOOGLE_CLOUD_PROJECT" --data-file=- >/dev/null 2>&1 || true
+    echo "Secret $BUFFER_SECRET_ID updated with latest version from $ENV_FILE."
+  else
+    echo "Secret $BUFFER_SECRET_ID already exists, skipping."
+  fi
+  unset buffer_key
 else
   buffer_key="$(grep -m1 "^BUFFER_API_KEY=" "$ENV_FILE" | cut -d= -f2- | tr -d "\r\n\"'" || true)"
   if [[ -z "$buffer_key" ]]; then
