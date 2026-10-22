@@ -354,11 +354,28 @@ $ curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" "$ADK_BAC
         </div>
 
         <div class="part-section">
+          <div class="part-label"><span class="icon">📸</span> 4. Visual Evidence</div>
+          <figure class="evidence-figure" style="margin-bottom: 20px;">
+            <img src="../screenshots/lab1-step8-cloud-frontend-terminal.png" alt="Lab 2 Step 6: Cloud Launch Profile Terminal" loading="lazy">
+            <figcaption>
+              <strong>Figure 6.1 — Cloud Launch Profile (run-frontend.sh --cloud):</strong> Terminal output confirming dynamic configuration resolution. The launcher reads <code>deployment_metadata.json</code>, resolves deployed Reasoning Engine <code>1836136314752204800</code>, and exports <code>ADK_BACKEND_ORIGIN</code> targeting the <code>us-central1</code> Vertex AI reverse proxy. Click to expand.
+            </figcaption>
+          </figure>
+
+          <figure class="evidence-figure">
+            <img src="../screenshots/lab1-step8-cloud-run-all-stages-posted.png" alt="Lab 2 Step 6: Cloud Reasoning Engine Full Stage Execution" loading="lazy">
+            <figcaption>
+              <strong>Figure 6.2 — Full Pipeline Execution against Cloud Reasoning Engine:</strong> Authentic Next.js dashboard run (Session <code>151756415931777024</code>) connected to the deployed Vertex AI backend. The orchestrator coordinated <code>research_agent</code> and <code>draft_agent</code> in the cloud, advanced the pipeline stages, and completed post drafting through the human approval gate. Click to expand.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="part-section">
           <div class="checkpoint-box">
             <div class="checkpoint-title"><span class="icon">✅</span> Step 6 Checkpoint: Local Frontend to Cloud Engine</div>
             <div class="checkpoint-content">
               <p><strong>Requirement:</strong> <code>npm run dev</code>, open the app, and run a full post: the pipeline panel lights up <em>Idea → Consulting memory → Researching → Drafting → Approval</em>, the approval dialog appears, and approving completes the post. Identical to Lab 1, but the agent is in <code>us-central1</code>.</p>
-              <p><strong>Fulfillment:</strong> The Next.js frontend proxy forwarded requests with ADC credentials to the Reasoning Engine in <code>us-central1</code>. The full 5-stage pipeline progressed smoothly, with human approval gating publication.</p>
+              <p><strong>Fulfillment:</strong> Verified in Figures 6.1 &amp; 6.2. The Next.js frontend proxy forwarded requests with ADC credentials to the Reasoning Engine in <code>us-central1</code>. The full 5-stage pipeline progressed smoothly, with human approval gating publication.</p>
             </div>
           </div>
         </div>
