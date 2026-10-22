@@ -172,10 +172,15 @@ The instructor's reference material for Lab 4 introduces several core architectu
 
 The documentation repository is structured to publish directly via GitHub Pages, featuring a **Split-Gateway Portal** and **Universal 1-Click Cross-Branch Switcher**:
 
-### Repository & Site Architecture
+### Canonical Release & GitHub Pages Deployment Topology
 * **Published Directory**: `/docs` (Root of the published site).
+* **Production Deployment Branch (`main`)**: The default `main` branch serves as the permanent production trunk for GitHub Pages (`https://duncmon.github.io/ai-devcamp-labs/`). It is fast-forwarded/merged with each verified lab milestone, so GitHub Pages never requires re-pointing when moving across labs.
+* **Pillar Checkpoint Branches & Tags**:
+  * `duncan-lab1`: Lab 1 implementation and initial Lab 2 scale foundations (tagged `LabEndSession2`, `lab2`).
+  * `duncan-lab3`: Full Lab 3 (Govern) implementation, tagged **`lab3-verified`** (and `lab3`) at commit `f2c1a7c` (100% verified across Model Armor, Cloud DLP, Registry, Gateway, and 8/8 Red Team scoresheet).
+  * `duncan-lab4`: Active working branch for Lab 4 (Optimise), tagged **`lab4-step1`** (and `lab4`) at commit `bb9a3a2` (verified 5/5 green baseline, site navigation overhaul, sticky TOC rail, and Eval Hardening annexe).
 * **Split-Gateway Homepage**: Hosted at `/docs/index.html`, translating the attendee whiteboard sketch into a clean two-door choice between the *Instructor Workshop Track* and *Duncan's Engineering Portfolio*, accompanied by a parallel quick directory table.
-* **Duncan's Walkthrough Portfolio**: Subpages `docs/lab-1.html`, `docs/lab-2.html`, `docs/lab-3.html`, `docs/learnings.html`, `docs/backend-binding.html`, `docs/shell-script-flags.html`, `docs/stepper-and-buffer-confirmation.html`.
+* **Duncan's Walkthrough Portfolio**: Subpages `docs/lab-1.html`, `docs/lab-2.html`, `docs/lab-3.html`, `docs/lab-4.html`, `docs/learnings.html`, `docs/eval-hardening-and-fixtures.html`, `docs/backend-binding.html`, `docs/shell-script-flags.html`, `docs/stepper-and-buffer-confirmation.html`, `docs/site-design.html`.
 * **Upstream Instructor Archive**: Fully unlocked and preserved under `docs/instructor/` (synced from tag `pillar-optimize`), accessible at `https://duncmon.github.io/ai-devcamp-labs/instructor/`.
 * **Universal 1-Click Cross-Branch Switcher**:
   * On Attendee pages: Navbar companion pill (`[ 📖 Instructor Lab X Guide ↗ ]`) jumping straight to `instructor/lab-X.html`.
@@ -184,12 +189,12 @@ The documentation repository is structured to publish directly via GitHub Pages,
 * **Asset Resolution**: All screenshots reside in `docs/screenshots/` and resolve via relative paths `screenshots/<filename>.png`.
 * **Jekyll Bypass**: `.nojekyll` files reside in both `docs/.nojekyll` and `docs/walkthrough/.nojekyll`.
 
-### Required GitHub Settings
+### Required GitHub Settings (One-Time Setup)
 1. Navigate to repository **Settings** on GitHub: `https://github.com/duncmon/ai-devcamp-labs/settings/pages`.
 2. Under **Build and deployment > Source**, select: **Deploy from a branch**.
-3. Under **Branch**, select: `duncan-lab3` (or `main` upon merge), and choose folder: **/docs**.
+3. Under **Branch**, select: **`main`**, and choose folder: **/docs**.
 4. Click **Save**.
-5. The live site will publish at: `https://duncmon.github.io/ai-devcamp-labs/`.
+5. The live site permanently publishes at: `https://duncmon.github.io/ai-devcamp-labs/`. Subsequent merges from `duncan-lab4` into `main` automatically deploy to the live site.
 
 ---
 
