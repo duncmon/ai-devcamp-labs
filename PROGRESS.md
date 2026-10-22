@@ -232,6 +232,14 @@ flowchart TD
 #### Phase 6: Run Lab 4 Step 1 (Baseline Golden Eval) [COMPLETED]
 * **Status:** ✅ **Completed**. Executed `./evals/run.sh` to establish baseline pass/fail metric. Initial 3/5 diagnostic run diagnosed and resolved via upstream parity (`mock_memory_agent.py` to `gemini-2.5-flash` in `us-central1`, and removing naive forced-image callback). Verified 5/5 PASSED, `All cases passed.` (runtime: 2m51.85s). Captured in `docs/lab-4.html`.
 
+#### Phase 6b: Site Navigation Overhaul, Google Dev Docs TOC Rail & Pillar 4 Learnings [COMPLETED]
+* **Status:** ✅ **Completed**.
+  - **Universal Header Navigation:** Added `Lab 4 (Optimise)` and active-state tracking across all 10 portfolio HTML pages (`index.html`, `lab-1.html`–`lab-4.html`, `learnings.html`, `backend-binding.html`, `shell-script-flags.html`, `stepper-and-buffer-confirmation.html`, `site-design.html`, and `eval-hardening-and-fixtures.html`).
+  - **Google Dev Docs Style Sticky Right-Hand TOC (`docs/toc.js`):** Built lightweight, cross-browser vanilla script with `IntersectionObserver` scroll-spy that automatically builds a sticky "On this page" TOC rail on desktop (`>= 1180px`), collapsing gracefully on mobile where top step chips take over.
+  - **Floating Back-to-Top Action:** Added circular floating `↑` button that smoothly fades in on scroll (> 300px) and smoothly returns to page top on click.
+  - **Pillar 4 (Optimise) Learnings Hub:** Extended `docs/learnings.html` with Pillar 4 and Learnings 28, 29, and 30.
+  - **New Technical Annexe (`docs/eval-hardening-and-fixtures.html`):** Authored dedicated deep-dive annexe covering test fixture isolation, regional mock model resolution, negative constraint substring collisions, and why confirmation gates must be deterministic code-level tools (`require_confirmation=True`). Streamlined `docs/lab-4.html` with clean summary links.
+
 #### Phase 7: Run Lab 4 Step 2 Golden Set Hardening & Exit-Code Trap [NEXT]
 * **Status:** ⏳ **Queued Next**. Break brand voice in `skills/brand-voice/SKILL.md` (require clichés); prove rubric failure; expose exit code 0 trap; restore code. Capture Mandatory Figures 2.1 & 2.2.
 

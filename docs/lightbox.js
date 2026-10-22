@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const lightboxImg = document.getElementById('lightboxImg');
   const lightboxCaption = document.getElementById('lightboxCaption');
 
-  document.querySelectorAll('figure.evidence-figure img, .diagram-tile img').forEach(img => {
+  document.querySelectorAll('figure.evidence-figure img, figure.step-figure img, .diagram-tile img, img.lightbox-trigger').forEach(img => {
     img.style.cursor = 'zoom-in';
     img.title = 'Click to expand full size';
     img.addEventListener('click', () => {
