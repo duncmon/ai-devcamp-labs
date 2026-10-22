@@ -265,31 +265,12 @@ def _catch_image_placeholder(
         return None
     text = "\n".join(p.text for p in parts if p.text)
     match = _IMAGE_PLACEHOLDER_RE.search(text)
-    prompt = None
-    if match:
-        prompt = match.group(1).strip()
-    else:
-        # Check if the user's turn or instruction explicitly asked for an illustration/image
-        req_text = ""
-        if callback_context.user_content and callback_context.user_content.parts:
-            req_text = " ".join(
-                p.text for p in callback_context.user_content.parts if p.text
-            ).lower()
-        if any(term in req_text for term in ("illustration", "illustrate", "image", "visual", "graphic")):
-            first_line = text.strip().split("\n")[0].strip("#* ")
-            prompt = f"A modern tech editorial illustration: {first_line[:150]}"
-            log.warning(
-                "draft_agent omitted generate_image despite image request in input; "
-                "forcing generate_image call with derived prompt: %s",
-                prompt,
-            )
-
-    if not prompt:
+    if not match:
         return None
-
+    prompt = match.group(1).strip()
     log.warning(
-        "draft_agent wrote an image placeholder or omitted image tool call; "
-        "forcing the real call with prompt: %s",
+        "draft_agent wrote an image placeholder instead of calling generate_image;"
+        " forcing the real call with its own description as the prompt: %s",
         prompt,
     )
     return LlmResponse(
