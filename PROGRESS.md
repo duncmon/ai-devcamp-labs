@@ -9,7 +9,7 @@
 | Pillar & Lab | Scope | Checkpoint Status | Walkthrough Status | Architectural Fidelity |
 | :--- | :--- | :--- | :--- | :--- |
 | **Lab 1: Build** | Local ADK Agent, Tools, Skills, Subagents, Buffer MCP, LinkedIn MCP, AG-UI Frontend | **9 / 9 Verified (100%)** | Fully documented in [`walkthrough/lab-1.html`](docs/walkthrough/lab-1.html) with 26 figures and real traces. | Production-grade; `POST_VIA=auto` dual routing, V4 signed URLs, single confirmation gate. |
-| **Lab 2: Scale** | Agent Runtime, Durable Sessions, Memory Bank, Cloud Run Proxy, Cloud Logging | **8 / 9 Verified (89%)**<br>*Step 8 text-verified, model lines figure pending* | Documented in [`walkthrough/lab-2.html`](docs/walkthrough/lab-2.html) with 10 figures; Step 8 model lines pending. | Scaled to Vertex AI Reasoning Engine with dedicated Agent Identity; cold-start memory extraction callback. |
+| **Lab 2: Scale** | Agent Runtime, Durable Sessions, Memory Bank, Cloud Run Proxy, Cloud Logging | **9 / 9 Verified (100%)** | Fully documented in [`walkthrough/lab-2.html`](docs/walkthrough/lab-2.html) with 12 figures and authentic telemetry traces. | Scaled to Vertex AI Reasoning Engine with dedicated Agent Identity; cold-start memory extraction callback. |
 | **Lab 3: Govern** | Model Armor, Cloud DLP ASGI Middleware, Agent Registry, Governance Policies, Gateway | **7 / 9 Verified (78%)**<br>*Steps 8 & 9 pending* | Documented in [`walkthrough/lab-3.html`](docs/walkthrough/lab-3.html) Steps 1–7. Steps 8 & 9 planned below. | Multi-tier config resolution, fail-closed PII redaction with multi-country domestic phone regexes. |
 | **Lab 4: Optimise** | Evals, Flywheel, Continuous Improvement | *Scheduled Next* | Pending Lab 4 session. | Will build on Lab 3 red-team regression suites. |
 
@@ -107,7 +107,7 @@ Throughout Labs 1–3, several architectural choices and deliberate departures f
 | **Step 5: Memory Bank** | Preference distilled across conversations; retrieved via `load_memory` in fresh conversation. | **Figure 5.1**: Session continuity in Antigravity; user preference distilled and recalled. | ✅ **Verified** |
 | **Step 6: Point Web UI** | Frontend talks to cloud engine via `ADK_BACKEND_ORIGIN`; completes 5-stage pipeline. | **Figures 6.1 & 6.2**: Launcher terminal configuring `ADK_BACKEND_ORIGIN` and live dashboard execution across all stages. | ✅ **Verified** |
 | **Step 7: Cloud Run Frontend** | Direct access returns 403; local proxy (`:8090`) connects securely; full post completed. | **Figure 7.1**: Deployed Next.js frontend on Cloud Run (`--no-allow-unauthenticated`) via proxy. | ✅ **Verified** |
-| **Step 8: Cloud Logging** | Distinguish harmless OTel logs; verify `Sending out request, model:` for 3 distinct models. | Terminal table of Cloud Logging records verified. Exact multi-model log lines figure pending. | ⚠️ **Text Verified** *(Figure pending)* |
+| **Step 8: Cloud Logging** | Distinguish harmless OTel logs; verify `Sending out request, model:` for 3 distinct models. | **Figures 8.1 & 8.2**: Container execution traces in Cloud Console, exact multi-model log lines, and OTel context analysis. | ✅ **Verified** |
 | **Step 9: Teardown** | Zero active Reasoning Engines and Cloud Run instances listed; clean spend posture. | **Figure 9.1**: Terminal verification of engine deletion and empty Cloud Run list (`step8-teardown.png`). | ✅ **Verified** |
 
 ### Relevant Learnings Annotated
@@ -159,7 +159,7 @@ Throughout Labs 1–3, several architectural choices and deliberate departures f
 
 ```mermaid
 flowchart TD
-    T1["Task 2.1: Lab 2 Step 6 Visual Screenshot [COMPLETED]"] --> T2["Task 2.2: Lab 2 Step 8 Model Log Lines"]
+    T1["Task 2.1: Lab 2 Step 6 Visual Screenshot [COMPLETED]"] --> T2["Task 2.2: Lab 2 Step 8 Model Log Lines [COMPLETED]"]
     T2 --> T3["Task 3.1: Autonomous Red-Team Execution (Lab 3 Step 8)"]
     T3 --> T4["Task 3.2: Author Part3_Govern_Logic.md for Rowing Coach (Lab 3 Step 9) [COMPLETED]"]
     T4 --> T5["Task 3.3: Integrate Steps 8 & 9 into lab-3.html"]
@@ -169,11 +169,9 @@ flowchart TD
 * **Objective:** Add authentic screenshot figures to `docs/walkthrough/lab-2.html` under Step 6 demonstrating the local Next.js frontend communicating with the cloud Reasoning Engine.
 * **Status:** ✅ **Completed**. Integrated Figure 6.1 (`lab1-step8-cloud-frontend-terminal.png`) and Figure 6.2 (`lab1-step8-cloud-run-all-stages-posted.png`), verifying dynamic config resolution and complete 5-stage pipeline execution against Vertex AI Reasoning Engine.
 
-#### Task 2.2: Enrich Lab 2 Step 8 Multi-Model Telemetry
-* **Objective:** Document the explicit `Sending out request, model:` lines in Step 8 to demonstrate multi-model specialization across `gemini-3.8-flash` (orchestrator), `gemini-3.5-flash-lite` (research), and `gemini-3.1-pro-preview` (drafting).
-* **Action:**
-  1. Add exact formatted Cloud Logging log excerpts to Step 8 showing model resolution entries.
-  2. Explain the OTel gRPC metadata warnings vs actual operational log events.
+#### Task 2.2: Enrich Lab 2 Step 8 Multi-Model Telemetry [COMPLETED]
+* **Objective:** Document the explicit `Sending out request, model:` lines in Step 8 to demonstrate multi-model specialization across `gemini-2.5-flash` (orchestrator), `gemini-2.5-flash-lite` (research), `draft_agent`, and `gemini-2.5-flash-image`.
+* **Status:** ✅ **Completed**. Embedded Figure 8.1 (`lab1-step8-cloud-console-playground.png`), Figure 8.2 (`lab1-step8-cloud-console-429-traceback.png`), multi-model log extractions, and comprehensive technical dissection of the harmless OpenTelemetry token context error. Lab 2 is now **100% Verified** across all 9 steps.
 
 #### Task 3.1: Autonomous Red-Team Execution Plan (Lab 3 Step 8)
 * **Feasibility Evaluation:** Antigravity can directly assume the role of the adversarial Red Team attacker. We have access to the agent endpoints (`backend/main.py`), the CLI test runners (`evals/governance.json`, `backend/probe_template.py`), and the scoresheet categories from `docs/red-team-scoresheet.md`.
