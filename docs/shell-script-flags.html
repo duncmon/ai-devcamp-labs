@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Adapting Shell Scripts for CLI Flags &amp; Launch Profiles — Social Spark Engineering</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    try {
+      var t = localStorage.getItem("social-spark-theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+  <style>
+    /* Page-Specific Enhancements for Educational Guide */
+    .quick-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 20px 0 32px;
+      padding: 14px 18px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 13px;
+    }
+    .quick-nav-label {
+      font-weight: 700;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-right: 6px;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: .06em;
+    }
+    .quick-nav a {
+      color: var(--accent);
+      text-decoration: none;
+      padding: 3px 10px;
+      border-radius: 6px;
+      background: var(--accent-soft);
+      transition: all .15s ease;
+      font-size: 12.5px;
+      font-weight: 500;
+    }
+    .quick-nav a:hover {
+      background: var(--accent);
+      color: #ffffff;
+    }
+    .code-container {
+      position: relative;
+      margin: 14px 0 20px;
+    }
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 16px;
+      background: #1e1e2e;
+      border: 1px solid #313244;
+      border-bottom: none;
+      border-top-left-radius: 10px;
+      border-top-right-radius: 10px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #a6adc8;
+    }
+    .code-header .file-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+    }
+    .code-header .file-name::before {
+      content: "";
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #fab387;
+    }
+    .code-container pre {
+      margin-top: 0;
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+    }
+    .copy-btn {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #cdd6f4;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .copy-btn:hover {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent);
+    }
+    .data-table-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      margin: 16px 0 24px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+    }
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+      text-align: left;
+    }
+    table.data-table th {
+      background: rgba(0,0,0,0.03);
+      padding: 12px 14px;
+      font-weight: 700;
+      border-bottom: 2px solid var(--border);
+      color: var(--text);
+    }
+    table.data-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: top;
+    }
+    table.data-table tr:last-child td {
+      border-bottom: none;
+    }
+    table.data-table tr:hover td {
+      background: rgba(0,0,0,0.015);
+    }
+    .diagram-frame {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+      padding: 20px;
+      margin: 20px 0;
+      overflow-x: auto;
+      box-shadow: var(--shadow);
+    }
+    .diagram-frame svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      min-width: 680px;
+    }
+    .stat-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin: 20px 0 28px;
+    }
+    .stat-pill {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: var(--shadow);
+    }
+    .stat-pill .num {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--accent);
+      font-family: var(--font-mono);
+      margin-bottom: 2px;
+    }
+    .stat-pill .label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      font-weight: 600;
+    }
+    .comparison-check {
+      color: #34a853;
+      font-weight: bold;
+    }
+    .comparison-cross {
+      color: #ea4335;
+      font-weight: bold;
+    }
+    .breadcrumbs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .breadcrumbs a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+    .breadcrumbs a:hover {
+      color: var(--accent);
+    }
+    .breadcrumbs .sep {
+      color: var(--faint);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-left">
+      <div class="brand-mark"></div>
+      <a href="index.html" class="nav-title">Social Spark — Attendee Portfolio</a>
+      <span class="nav-subtitle">GDG London AI DevCamp 2026</span>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html">Overview</a>
+      <a href="lab-1.html">Lab 1 (Build)</a>
+      <a href="lab-2.html">Lab 2 (Scale)</a>
+      <a href="lab-3.html">Lab 3 (Govern)</a>
+      <a href="learnings.html">Learnings</a>
+      <a href="backend-binding.html">Backend Binding</a>
+      <a href="shell-script-flags.html" class="active">CLI Flags Guide</a>
+      <a href="stepper-and-buffer-confirmation.html">Stepper &amp; Confirmation</a>
+      <a href="https://sonikajanagill.com/ai-devcamp-labs/index.html" target="_blank" rel="noopener" class="upstream-pill">
+        Upstream Labs ↗
+      </a>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">🌗</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Breadcrumb Navigation -->
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+      <a href="index.html">Portfolio</a>
+      <span class="sep">/</span>
+      <a href="backend-binding.html">Backend Binding</a>
+      <span class="sep">/</span>
+      <span style="color: var(--text); font-weight: 600;">Educational Guide: Shell Script Flags</span>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-meta">
+        <span class="badge blue">Production Tooling</span>
+        <span class="badge green">POSIX Standards</span>
+        <span class="badge yellow">Twelve-Factor App</span>
+        <span class="badge red">Darwin / Linux Parity</span>
+        <span>Guide: <strong>Shell Script CLI Flags</strong></span>
+      </div>
+      <h1>Adapting Shell Scripts for CLI Flags &amp; Launch Profiles</h1>
+      <p class="lead">
+        A deep, authoritative educational guide on transforming fragile, hardcoded shell scripts into robust, POSIX-compliant CLI utilities. Explore the Unix philosophy, stack shifts, BSD vs. GNU compatibility on macOS Darwin, pure-Bash state machines, and a production case study grounded in Social Spark's <code>run-frontend.sh</code>.
+      </p>
+
+      <!-- Key Engineering Statistics -->
+      <div class="stat-strip">
+        <div class="stat-pill">
+          <div class="num">3</div>
+          <div class="label">Parsing Paradigms Evaluated</div>
+        </div>
+        <div class="stat-pill">
+          <div class="num">0</div>
+          <div class="label">External Dependencies Required</div>
+        </div>
+        <div class="stat-pill">
+          <div class="num">100%</div>
+          <div class="label">macOS Darwin &amp; Linux Parity</div>
+        </div>
+        <div class="stat-pill">
+          <div class="num">IEEE 1003.1</div>
+          <div class="label">POSIX Syntax Compliant</div>
+        </div>
+      </div>
+
+      <!-- Quick Jump Navigation -->
+      <div class="quick-nav">
+        <span class="quick-nav-label">Jump to Section:</span>
+        <a href="#why-flags">1. Architectural Rationale</a>
+        <a href="#shift-stack">2. Shift Stack Mechanism (SVG)</a>
+        <a href="#approach-1">3. Approach 1: Manual Loop</a>
+        <a href="#approach-2">4. Approach 2: POSIX getopts</a>
+        <a href="#approach-3">5. Approach 3: Advanced Parser &amp; BSD Trap</a>
+        <a href="#state-machine">6. State Machine Flowchart (SVG)</a>
+        <a href="#comparison">7. Comparison Matrix</a>
+        <a href="#error-handling">8. Error Handling &amp; Validation</a>
+        <a href="#case-study">9. Case Study: run-frontend.sh</a>
+        <a href="#cross-links">10. Related Hubs</a>
+      </div>
+    </section>
+
+    <!-- SECTION 1: ARCHITECTURAL RATIONALE -->
+    <article class="step-card" id="why-flags">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Section 1 · Architectural Foundation</span>
+          <h2 class="step-title">Why Scripts Need Flags: Decoupling Runtime Profiles from File Mutations</h2>
+        </div>
+        <span class="badge blue">Factor III &amp; X</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> The File Mutation Anti-Pattern</div>
+          <p>
+            In rapid prototyping, developers often configure shell scripts and backend endpoints through manual file edits. In Social Spark, toggling between local testing on port <code>8000</code> and deployed testing against Google Cloud Vertex AI Reasoning Engine originally required opening <code>frontend/.env.local</code> and hand-editing <code>ADK_BACKEND_ORIGIN</code>.
+          </p>
+          <p>
+            This practice violates two foundational tenets of cloud-native systems architecture:
+          </p>
+          <ul>
+            <li>
+              <strong>Twelve-Factor App — Factor III (Config):</strong> <em>"Store config in the environment, not in the code or checked-in filesystem."</em> Modifying local configuration files to toggle environments creates configuration drift, dirty Git worktrees, and accidental leaks of internal endpoints or secrets into version control.
+            </li>
+            <li>
+              <strong>Twelve-Factor App — Factor X (Dev/Prod Parity):</strong> <em>"Keep development, staging, and production as similar as possible."</em> When scripts rely on persistent disk state rather than explicit invocation flags, automated CI/CD runners and local developer machines quickly diverge.
+            </li>
+          </ul>
+
+          <div class="callout warn">
+            <strong>The Social Spark Post-Mortem (Lab 1 Step 8):</strong> During Lab 2 (Scale &amp; Deploy), deployment scripts wrote the remote Vertex AI Reasoning Engine resource ID into <code>frontend/.env.local</code>. When developers finished Lab 2 and ran Step 9 (Teardown &amp; Cost Hygiene) to delete the cloud engine, <code>.env.local</code> remained populated with the dead resource ID. Returning to Lab 1 crashed the CopilotKit chat with <code>HTTP 404 NOT_FOUND: Resource projects/.../reasoningEngines/... not found</code>. If developers had used command-line flags (<code>./run-frontend.sh --local</code> vs <code>./run-frontend.sh --cloud</code>), this configuration drift would have been completely impossible.
+          </div>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">📜</span> POSIX Utility Conventions (IEEE Std 1003.1-2017)</div>
+          <p>
+            Command-line interfaces must respect the <strong>Principle of Least Astonishment</strong>. The Open Group Base Specifications Issue 7 / IEEE Std 1003.1-2017 (Section 12.2 Utility Syntax Guidelines) codifies conventions that every Unix developer expects:
+          </p>
+          <div class="data-table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 25%;">Guideline</th>
+                  <th style="width: 35%;">POSIX Specification</th>
+                  <th style="width: 40%;">Shell Implementation Impact</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Guideline 3 (Short Options)</strong></td>
+                  <td>Options must be preceded by a single hyphen <code>-</code> and consist of a single alphanumeric character.</td>
+                  <td>Provides quick shortcuts: <code>-l</code> for local, <code>-c</code> for cloud, <code>-p 3000</code> for port.</td>
+                </tr>
+                <tr>
+                  <td><strong>Guideline 4 (Flag Clustering)</strong></td>
+                  <td>Multiple options without option-arguments should be groupable behind a single hyphen (e.g., <code>-lc</code> instead of <code>-l -c</code>).</td>
+                  <td>Native to POSIX <code>getopts</code>; requires custom token expansion logic in manual loops.</td>
+                </tr>
+                <tr>
+                  <td><strong>Guideline 5 (Argument Delimiters)</strong></td>
+                  <td>Option-arguments may follow the option character separated by space (<code>-p 3000</code>) or directly adjacent (<code>-p3000</code>).</td>
+                  <td>GNU conventions extend this to long flags with equals signs: <code>--port=3000</code>.</td>
+                </tr>
+                <tr>
+                  <td><strong>Guideline 10 (End of Options)</strong></td>
+                  <td>The first <code>--</code> argument that is not an option-argument signals the end of options. Subsequent arguments are positional operands.</td>
+                  <td>Allows scripts to accept arguments that begin with a hyphen without parsing them as flags: <code>./script.sh -- -filename.txt</code>.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- SECTION 2: SHIFT STACK MECHANISM -->
+    <article class="step-card" id="shift-stack">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Section 2 · Core Shell Mechanism</span>
+          <h2 class="step-title">Visualizing the Shift Stack Mechanism ($@, $1, $2, and shift)</h2>
+        </div>
+        <span class="badge green">Vector Architecture</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">⚙️</span> Positional Parameters and Array Mutation</div>
+          <p>
+            When a Bash script is invoked, the shell populates an internal 1-indexed array called <strong>Positional Parameters</strong>:
+          </p>
+          <ul>
+            <li><code>$0</code>: The name or path used to invoke the script.</li>
+            <li><code>$1, $2, ... $9</code>: The positional arguments. For arguments beyond the 9th, braces are mandatory: <code>${10}</code>.</li>
+            <li><code>$#</code>: The total integer count of remaining positional parameters.</li>
+            <li><code>"$@"</code>: All positional parameters as distinct quoted words (<code>"$1" "$2" ...</code>). Never use unquoted <code>$*</code>, which merges tokens and introduces whitespace splitting vulnerabilities!</li>
+          </ul>
+          <p>
+            The shell builtin command <code>shift [n]</code> shifts the positional parameter array to the left by <code>n</code> positions (defaulting to <code>1</code>). Elements <code>$1</code> through <code>$n</code> are discarded from the stack, <code>$(n+1)</code> becomes the new <code>$1</code>, and <code>$#</code> is decremented by <code>n</code>.
+          </p>
+
+          <!-- DIAGRAM 1: Responsive Vector SVG Diagram for Shift Stack -->
+          <div class="diagram-frame">
+            <svg viewBox="0 0 940 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Shift Stack Mechanism Diagram">
+              <defs>
+                <linearGradient id="gradAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#4285F4" stop-opacity="0.18"/>
+                  <stop offset="100%" stop-color="#4285F4" stop-opacity="0.04"/>
+                </linearGradient>
+                <linearGradient id="gradDiscard" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#EA4335" stop-opacity="0.15"/>
+                  <stop offset="100%" stop-color="#EA4335" stop-opacity="0.03"/>
+                </linearGradient>
+                <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1 L 10 5 L 0 9 z" fill="#4285F4"/>
+                </marker>
+                <marker id="arrowRed" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1 L 10 5 L 0 9 z" fill="#EA4335"/>
+                </marker>
+              </defs>
+
+              <!-- State 1 Header -->
+              <text x="30" y="32" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="14" font-weight="700" fill="#4285F4">STATE 1: Initial Invocation ($# = 4)</text>
+              <text x="30" y="50" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#8a909b">Command: ./run-frontend.sh --port 3000 --cloud extra.txt</text>
+
+              <!-- State 1 Stack Blocks -->
+              <!-- Block 1 ($1) -->
+              <g transform="translate(30, 64)">
+                <rect width="140" height="60" rx="8" fill="url(#gradAccent)" stroke="#4285F4" stroke-width="2"/>
+                <text x="16" y="24" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="700" fill="#4285F4">PARAMETER $1</text>
+                <text x="16" y="46" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" font-weight="700" fill="#e7e9ec">"--port"</text>
+              </g>
+
+              <!-- Block 2 ($2) -->
+              <g transform="translate(185, 64)">
+                <rect width="140" height="60" rx="8" fill="url(#gradAccent)" stroke="#4285F4" stroke-width="2"/>
+                <text x="16" y="24" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="700" fill="#4285F4">PARAMETER $2</text>
+                <text x="16" y="46" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" font-weight="700" fill="#e7e9ec">"3000"</text>
+              </g>
+
+              <!-- Block 3 ($3) -->
+              <g transform="translate(340, 64)">
+                <rect width="140" height="60" rx="8" fill="#1e1e2e" stroke="#313244" stroke-width="1.5"/>
+                <text x="16" y="24" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" fill="#8a909b">PARAMETER $3</text>
+                <text x="16" y="46" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#cdd6f4">"--cloud"</text>
+              </g>
+
+              <!-- Block 4 ($4) -->
+              <g transform="translate(495, 64)">
+                <rect width="140" height="60" rx="8" fill="#1e1e2e" stroke="#313244" stroke-width="1.5"/>
+                <text x="16" y="24" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" fill="#8a909b">PARAMETER $4</text>
+                <text x="16" y="46" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#cdd6f4">"extra.txt"</text>
+              </g>
+
+              <!-- State 1 Transition Annotation -->
+              <g transform="translate(650, 64)">
+                <rect width="260" height="60" rx="8" fill="#1a1e24" stroke="#2a2f37"/>
+                <text x="14" y="24" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="11.5" font-weight="700" fill="#fbbc05">PARSER ACTION:</text>
+                <text x="14" y="44" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#e7e9ec">PORT=$2; shift 2</text>
+              </g>
+
+              <!-- Curved Transition Arrow from State 1 to State 2 -->
+              <path d="M 180 132 Q 180 162 260 162" fill="none" stroke="#EA4335" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#arrowRed)"/>
+              <text x="275" y="166" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5" font-weight="700" fill="#EA4335">shift 2 drops $1 and $2 from memory</text>
+
+              <!-- Separator Line 1 -->
+              <line x1="30" y1="184" x2="910" y2="184" stroke="#2a2f37" stroke-width="1"/>
+
+              <!-- State 2 Header -->
+              <text x="30" y="212" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="14" font-weight="700" fill="#34A853">STATE 2: After `shift 2` ($# = 2)</text>
+              <text x="30" y="230" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#8a909b">Previous $3 is now $1; Previous $4 is now $2</text>
+
+              <!-- Discarded Blocks Visual -->
+              <g transform="translate(30, 244)">
+                <rect width="180" height="54" rx="8" fill="url(#gradDiscard)" stroke="#EA4335" stroke-width="1.5" stroke-dasharray="4 4"/>
+                <text x="14" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="700" fill="#EA4335">DISCARDED TOKENS</text>
+                <text x="14" y="42" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#8a909b" text-decoration="line-through">"--port"  "3000"</text>
+              </g>
+
+              <!-- Active Block 1 (was $3) -->
+              <g transform="translate(225, 244)">
+                <rect width="150" height="54" rx="8" fill="url(#gradAccent)" stroke="#34A853" stroke-width="2"/>
+                <text x="14" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="700" fill="#34A853">NEW $1</text>
+                <text x="14" y="42" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" font-weight="700" fill="#e7e9ec">"--cloud"</text>
+              </g>
+
+              <!-- Active Block 2 (was $4) -->
+              <g transform="translate(390, 244)">
+                <rect width="150" height="54" rx="8" fill="#1e1e2e" stroke="#313244" stroke-width="1.5"/>
+                <text x="14" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" fill="#8a909b">NEW $2</text>
+                <text x="14" y="42" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#cdd6f4">"extra.txt"</text>
+              </g>
+
+              <!-- State 2 Action Annotation -->
+              <g transform="translate(650, 244)">
+                <rect width="260" height="54" rx="8" fill="#1a1e24" stroke="#2a2f37"/>
+                <text x="14" y="22" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="11.5" font-weight="700" fill="#fbbc05">PARSER ACTION:</text>
+                <text x="14" y="40" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#e7e9ec">TARGET="cloud"; shift 1</text>
+              </g>
+
+              <!-- Separator Line 2 -->
+              <line x1="30" y1="324" x2="910" y2="324" stroke="#2a2f37" stroke-width="1"/>
+
+              <!-- State 3 Header -->
+              <text x="30" y="352" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="14" font-weight="700" fill="#FBBC05">STATE 3: After `shift 1` ($# = 1)</text>
+              <text x="30" y="370" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#8a909b">Remaining token does not start with hyphen</text>
+
+              <!-- Discarded Block 2 Visual -->
+              <g transform="translate(30, 384)">
+                <rect width="120" height="54" rx="8" fill="url(#gradDiscard)" stroke="#EA4335" stroke-width="1.5" stroke-dasharray="4 4"/>
+                <text x="12" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="700" fill="#EA4335">DISCARDED</text>
+                <text x="12" y="42" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#8a909b" text-decoration="line-through">"--cloud"</text>
+              </g>
+
+              <!-- Remaining Active Block -->
+              <g transform="translate(165, 384)">
+                <rect width="180" height="54" rx="8" fill="#1e1e2e" stroke="#FBBC05" stroke-width="2"/>
+                <text x="14" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="700" fill="#FBBC05">FINAL $1 (OPERAND)</text>
+                <text x="14" y="42" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" font-weight="700" fill="#e7e9ec">"extra.txt"</text>
+              </g>
+
+              <!-- State 3 Action Annotation -->
+              <g transform="translate(650, 384)">
+                <rect width="260" height="54" rx="8" fill="#1a1e24" stroke="#2a2f37"/>
+                <text x="14" y="22" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="11.5" font-weight="700" fill="#34A853">TERMINATION CONDITION:</text>
+                <text x="14" y="40" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#e7e9ec">Option parsing breaks cleanly</text>
+              </g>
+            </svg>
+          </div>
+
+          <div class="callout info">
+            <strong>Defensive Shift Rule:</strong> Never execute <code>shift 2</code> without verifying that at least two parameters exist in the stack (<code>[[ $# -ge 2 ]]</code>). If a user passes <code>./run-frontend.sh --port</code> at the end of the argument list, executing an unvalidated <code>shift 2</code> causes Bash to crash with:
+            <br>
+            <code>bash: shift: 2: shift count must not be greater than the number of positional parameters</code>
+            <br>
+            Under <code>set -e</code>, this terminates the script immediately with a cryptic runtime error rather than a helpful syntax diagnostic.
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- SECTION 3: APPROACH 1 - MANUAL LOOP -->
+    <article class="step-card" id="approach-1">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Section 3 · Parsing Paradigm 1</span>
+          <h2 class="step-title">Approach 1: Simple Manual while / case / shift Loop</h2>
+        </div>
+        <span class="badge blue">Direct &amp; Readable</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">💡</span> Concept &amp; Ergonomics</div>
+          <p>
+            Approach 1 relies entirely on Bash's native pattern-matching engine inside a <code>case</code> statement wrapped in a <code>while [[ $# -gt 0 ]]</code> loop. It is the most intuitive approach for internal developer scripts requiring long flags (<code>--cloud</code>, <code>--local</code>) and equals-separated assignments (<code>--port=3000</code>).
+          </p>
+
+          <div class="code-container">
+            <div class="code-header">
+              <span class="file-name">approach1_manual_loop.sh</span>
+              <button class="copy-btn" onclick="copySnippet(this)">Copy Script</button>
+            </div>
+            <pre><code>#!/usr/bin/env bash
+# ==============================================================================
+# Approach 1: Simple Manual while / case / shift Loop
+# Supports: --local, --cloud, --port 3000, --port=3000, --help, --
+# ==============================================================================
+set -euo pipefail
+
+# Default configuration values
+TARGET="local"
+PORT=3000
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -l|--local)
+      TARGET="local"
+      shift 1
+      ;;
+    -c|--cloud)
+      TARGET="cloud"
+      shift 1
+      ;;
+    -p|--port)
+      # Space-separated syntax: --port 3000
+      # Guard against missing value or value masquerading as next flag
+      if [[ $# -lt 2 || "$2" =~ ^- ]]; then
+        echo "Error: $1 requires a non-empty port argument." >&2
+        exit 2
+      fi
+      PORT="$2"
+      shift 2
+      ;;
+    --port=*)
+      # Inline equals syntax: --port=3000
+      # Strip pattern '--port=' from the front of $1
+      PORT="${1#*=}"
+      if [[ -z "$PORT" ]]; then
+        echo "Error: --port= requires a non-empty port argument." >&2
+        exit 2
+      fi
+      shift 1
+      ;;
+    -h|--help)
+      echo "Usage: $0 [--local|--cloud] [--port &lt;num&gt;|--port=&lt;num&gt;]"
+      exit 0
+      ;;
+    --)
+      # Explicit end of options delimiter (POSIX Guideline 10)
+      shift 1
+      break
+      ;;
+    -*)
+      echo "Error: Unrecognized option '$1'. Use --help for usage." >&2
+      exit 2
+      ;;
+    *)
+      # Non-option positional argument encountered
+      echo "Error: Unexpected positional operand '$1'." >&2
+      exit 2
+      ;;
+  esac
+done
+
+echo "Configuration Resolved: TARGET=$TARGET, PORT=$PORT"</code></pre>
+          </div>
+
+          <div class="checkpoint-box">
+            <div class="checkpoint-title">Key Mechanics Deconstructed</div>
+            <div class="checkpoint-content">
+              <ul>
+                <li><strong>Inline Equals Extraction (<code>${1#*=}</code>):</strong> Uses Bash's substring parameter expansion to strip everything up to and including the first <code>=</code> character. This cleanly parses <code>--port=8080</code> without needing a second shift!</li>
+                <li><strong>Validation Guard (<code>[[ $# -lt 2 || "$2" =~ ^- ]]</code>):</strong> Ensures that when <code>--port</code> is passed, a second token actually exists and does not start with a hyphen (preventing accidental consumption of <code>-c</code> as the port value in <code>--port -c</code>).</li>
+                <li><strong>Exit Code 2:</strong> Follows standard Unix utility conventions by returning exit code <code>2</code> for command-line syntax errors, reserving exit code <code>1</code> for general runtime failures.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- SECTION 4: APPROACH 2 - POSIX GETOPTS -->
+    <article class="step-card" id="approach-2">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Section 4 · Parsing Paradigm 2</span>
+          <h2 class="step-title">Approach 2: POSIX Standard getopts (Short Flags &amp; Clustering)</h2>
+        </div>
+        <span class="badge yellow">POSIX IEEE 1003.1</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">⚙️</span> Standardized Single-Character Parser</div>
+          <p>
+            The <code>getopts</code> shell builtin is defined by POSIX standards and exists across all compliant shells (Bourne <code>sh</code>, <code>ash</code>, <code>dash</code>, <code>ksh</code>, <code>bash</code>, <code>zsh</code>). It is designed specifically for single-character options (<code>-l</code>, <code>-c</code>, <code>-p 3000</code>) and provides automatic support for flag clustering (e.g., <code>-lc</code>).
+          </p>
+
+          <div class="code-container">
+            <div class="code-header">
+              <span class="file-name">approach2_posix_getopts.sh</span>
+              <button class="copy-btn" onclick="copySnippet(this)">Copy Script</button>
+            </div>
+            <pre><code>#!/usr/bin/env bash
+# ==============================================================================
+# Approach 2: POSIX Standard getopts Builtin
+# Supports: -l, -c, -p &lt;port&gt;, -h, clustered flags (-lc, -lp 8000)
+# ==============================================================================
+set -euo pipefail
+
+TARGET="local"
+PORT=3000
+
+# OPTSTRING: ":lcp:h"
+# - Leading colon ':' enables silent error reporting mode
+# - 'l', 'c', 'h' are switch flags (no argument expected)
+# - 'p:' specifies that 'p' requires an argument value
+OPTIND=1
+while getopts ":lcp:h" opt; do
+  case "$opt" in
+    l)
+      TARGET="local"
+      ;;
+    c)
+      TARGET="cloud"
+      ;;
+    p)
+      PORT="$OPTARG"
+      ;;
+    h)
+      echo "Usage: $0 [-l] [-c] [-p port]"
+      exit 0
+      ;;
+    :)
+      # Invoked when an option expecting an argument is missing that argument
+      echo "Error: Option -$OPTARG requires an argument." >&2
+      exit 2
+      ;;
+    \?)
+      # Invoked on any unknown or unrecognized option character
+      echo "Error: Invalid option -$OPTARG. Use -h for help." >&2
+      exit 2
+      ;;
+  esac
+done
+
+# Strip all processed flags and their arguments from the positional stack
+shift $((OPTIND - 1))
+
+echo "Configuration Resolved: TARGET=$TARGET, PORT=$PORT"
+if [[ $# -gt 0 ]]; then
+  echo "Remaining Positional Operands: $*"
+fi</code></pre>
+          </div>
+
+          <div class="checkpoint-box">
+            <div class="checkpoint-title">Understanding the getopts State Machine</div>
+            <div class="checkpoint-content">
+              <ul>
+                <li><strong>Silent Error Mode (Leading Colon):</strong> When the optstring begins with a colon (<code>:lcp:h</code>), <code>getopts</code> suppresses default verbose shell error messages. It sets <code>$opt</code> to <code>:</code> when an argument is missing and <code>?</code> when an unknown flag is encountered, populating <code>$OPTARG</code> with the offending character.</li>
+                <li><strong>Clustering Mechanics:</strong> If invoked with <code>-lc</code>, <code>getopts</code> returns <code>l</code> on the first iteration without advancing <code>$OPTIND</code>, then returns <code>c</code> on the next iteration from the same token.</li>
+                <li><strong>The Stack Alignment Formula:</strong> After the loop, <code>shift $((OPTIND - 1))</code> resets <code>$@</code> so that <code>$1</code> points to the first non-option positional argument.</li>
+                <li><strong>The Critical Dealbreaker:</strong> POSIX <code>getopts</code> <em>does not support long options</em> (e.g. <code>--cloud</code>). While some hacky workarounds exist (such as declaring <code>-:</code> in the optstring), they break POSIX clustering and quickly become unmaintainable.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- SECTION 5: APPROACH 3 - ADVANCED PARSER & BSD TRAP -->
+    <article class="step-card" id="approach-3">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Section 5 · Enterprise Solution</span>
+          <h2 class="step-title">Approach 3: Universal Parser &amp; The macOS BSD vs. Linux GNU Trap</h2>
+        </div>
+        <span class="badge red">Cross-Platform Dilemma</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">⚠️</span> The BSD vs. GNU getopt Trap on macOS Darwin</div>
+          <p>
+            When developers seek to support both short (<code>-c</code>) and long (<code>--cloud</code>) options, they often turn to the external binary <code>getopt</code> (notice the absence of the 's'). On modern Linux distributions (Debian, Ubuntu, Red Hat), <code>getopt</code> is provided by <code>util-linux</code> and supports the enhanced syntax:
+          </p>
+          <pre><code># Works on Linux, FAILS on macOS Darwin:
+PARSED=$(getopt -o lcp:h -l local,cloud,port:,help -- "$@")</code></pre>
+          <p>
+            However, macOS Darwin ships with <strong>traditional BSD getopt</strong>. When executed on macOS:
+          </p>
+          <pre><code>$ getopt "h" --help
+getopt: illegal option -- -
+getopt: illegal option -- e
+getopt: illegal option -- l
+getopt: illegal option -- p</code></pre>
+          <p>
+            BSD <code>getopt</code> treats the leading hyphen in <code>--help</code> as the option character, fails on long options, and mangles arguments containing spaces. Forcing teammates to run <code>brew install gnu-getopt</code> and fiddle with their <code>$PATH</code> introduces unacceptable developer friction and breaks in minimal CI containers.
+          </p>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🚀</span> The Solution: Pure-Bash Unified State Machine</div>
+          <p>
+            The enterprise-grade solution used in production platforms like Google Cloud and Social Spark is a <strong>zero-dependency pure-Bash state machine</strong>. It supports short and long flags simultaneously, handles equals and space delimiters, provides strict error handling, and runs identically on macOS Darwin (GPLv2 Bash 3.2.57) and Linux (Bash 5.x).
+          </p>
+
+          <div class="code-container">
+            <div class="code-header">
+              <span class="file-name">approach3_universal_parser.sh</span>
+              <button class="copy-btn" onclick="copySnippet(this)">Copy Script</button>
+            </div>
+            <pre><code>#!/usr/bin/env bash
+# ==============================================================================
+# Approach 3: Universal Pure-Bash Long & Short Option Parser
+# Fully compatible across macOS Darwin (Bash 3.2+) and Linux
+# ==============================================================================
+set -euo pipefail
+
+# --- Default State ---
+TARGET="local"
+PORT="3000"
+VERBOSE=0
+DRY_RUN=0
+
+print_usage() {
+  cat &lt;&lt; 'EOF'
+Usage: ./run-frontend.sh [OPTIONS]
+
+Launch the Social Spark CopilotKit Next.js frontend with explicit backend binding.
+
+Options:
+  -l, --local             Bind to local AG-UI backend at http://localhost:8000 (default)
+  -c, --cloud             Bind to deployed Vertex AI Reasoning Engine from metadata
+  -p, --port &lt;port&gt;       Set Next.js HTTP listen port (default: 3000)
+      --port=&lt;port&gt;       Alternative inline syntax for port assignment
+  -d, --dry-run           Print resolved environment variables and exit
+  -v, --verbose           Enable verbose configuration diagnostics
+  -h, --help              Display this help documentation and exit
+
+Examples:
+  ./run-frontend.sh
+  ./run-frontend.sh --cloud
+  ./run-frontend.sh -c -p 3005 --verbose
+  ./run-frontend.sh --local --port=3001
+EOF
+}
+
+# --- Core Argument Parsing State Machine ---
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    # Switch flags (short and long aliases)
+    -l|--local)
+      TARGET="local"
+      shift 1
+      ;;
+    -c|--cloud)
+      TARGET="cloud"
+      shift 1
+      ;;
+    -v|--verbose)
+      VERBOSE=1
+      shift 1
+      ;;
+    -d|--dry-run)
+      DRY_RUN=1
+      shift 1
+      ;;
+    -h|--help)
+      print_usage
+      exit 0
+      ;;
+
+    # Space-separated valued options: -p 3000 or --port 3000
+    -p|--port)
+      if [[ $# -lt 2 || "$2" =~ ^- ]]; then
+        echo "Error: $1 requires an integer port argument." >&2
+        echo "Try '$0 --help' for available options." >&2
+        exit 2
+      fi
+      PORT="$2"
+      shift 2
+      ;;
+
+    # Equals-separated valued options: --port=3000
+    --port=*)
+      PORT="${1#*=}"
+      if [[ -z "$PORT" ]]; then
+        echo "Error: $1 requires a non-empty port argument." >&2
+        echo "Try '$0 --help' for available options." >&2
+        exit 2
+      fi
+      shift 1
+      ;;
+
+    # POSIX End-of-Options delimiter
+    --)
+      shift 1
+      break
+      ;;
+
+    # Unknown options beginning with hyphen
+    -*)
+      echo "Error: Unrecognized option '$1'." >&2
+      echo "Try '$0 --help' for available options." >&2
+      exit 2
+      ;;
+
+    # Non-option positional arguments
+    *)
+      echo "Error: Unexpected argument '$1'." >&2
+      echo "Try '$0 --help' for available options." >&2
+      exit 2
+      ;;
+  esac
+done
+
+# --- Post-Parsing Semantic Validation ---
+if ! [[ "$PORT" =~ ^[0-9]+$ ]] || (( PORT &lt; 1024 || PORT > 65535 )); then
+  echo "Error: Port '$PORT' must be a valid non-privileged TCP port (1024–65535)." >&2
+  exit 2
+fi
+
+if [[ $VERBOSE -eq 1 ]]; then
+  echo "[DEBUG] Launch Profile : $TARGET"
+  echo "[DEBUG] HTTP Port      : $PORT"
+  echo "[DEBUG] Dry Run Mode   : $DRY_RUN"
+fi
+
+if [[ $DRY_RUN -eq 1 ]]; then
+  echo "Dry-run validation successful. Exiting without launching."
+  exit 0
+fi</code></pre>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- SECTION 6: STATE MACHINE FLOWCHART -->
+    <article class="step-card" id="state-machine">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Section 6 · Visual Architecture</span>
+          <h2 class="step-title">Argument Parsing State Machine Architecture (Vector Flowchart)</h2>
+        </div>
+        <span class="badge blue">Logic Decision Tree</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">📊</span> Control Flow Visualization</div>
+          <p>
+            The flowchart below illustrates the execution lifecycle of Approach 3: from token ingestion and pattern classification to mutation shifts, post-parsing validation, and process execution.
+          </p>
+
+          <!-- DIAGRAM 2: Responsive Vector SVG Diagram for State Machine -->
+          <div class="diagram-frame">
+            <svg viewBox="0 0 940 580" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Argument Parsing State Machine Flowchart">
+              <defs>
+                <marker id="flowArrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1 L 10 5 L 0 9 z" fill="#8a909b"/>
+                </marker>
+                <marker id="flowArrowBlue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1 L 10 5 L 0 9 z" fill="#4285F4"/>
+                </marker>
+                <marker id="flowArrowRed" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1 L 10 5 L 0 9 z" fill="#EA4335"/>
+                </marker>
+                <marker id="flowArrowGreen" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1 L 10 5 L 0 9 z" fill="#34A853"/>
+                </marker>
+              </defs>
+
+              <!-- Start Pill -->
+              <g transform="translate(390, 16)">
+                <rect width="160" height="38" rx="19" fill="#1e1e2e" stroke="#4285F4" stroke-width="2"/>
+                <text x="80" y="24" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="12.5" font-weight="700" fill="#4285F4" text-anchor="middle">RECEIVE ARGS ($@)</text>
+              </g>
+
+              <!-- Flow Arrow down to Loop Condition -->
+              <line x1="470" y1="54" x2="470" y2="82" stroke="#8a909b" stroke-width="1.5" marker-end="url(#flowArrow)"/>
+
+              <!-- Loop Condition Diamond: Is $# > 0? -->
+              <g transform="translate(470, 120)">
+                <polygon points="0,-36 80,0 0,36 -80,0" fill="#1a1e24" stroke="#FBBC05" stroke-width="2"/>
+                <text x="0" y="4" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="12" font-weight="700" fill="#FBBC05" text-anchor="middle">Is $# &gt; 0?</text>
+              </g>
+
+              <!-- 'No' Branch: Exit Loop to Validation -->
+              <line x1="550" y1="120" x2="720" y2="120" stroke="#34A853" stroke-width="1.5" marker-end="url(#flowArrowGreen)"/>
+              <text x="615" y="112" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="700" fill="#34A853">[No: Exhausted]</text>
+
+              <!-- Validation & Launch Nodes on Right -->
+              <g transform="translate(720, 96)">
+                <rect width="180" height="48" rx="8" fill="#1e1e2e" stroke="#34A853" stroke-width="1.5"/>
+                <text x="90" y="22" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="11" font-weight="700" fill="#34A853" text-anchor="middle">VALIDATE PARAMS</text>
+                <text x="90" y="38" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#a7adb6" text-anchor="middle">Port range, default fallbacks</text>
+              </g>
+
+              <line x1="810" y1="144" x2="810" y2="176" stroke="#34A853" stroke-width="1.5" marker-end="url(#flowArrowGreen)"/>
+
+              <g transform="translate(720, 176)">
+                <rect width="180" height="44" rx="22" fill="rgba(52, 168, 83, 0.15)" stroke="#34A853" stroke-width="2"/>
+                <text x="90" y="27" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="12" font-weight="700" fill="#34A853" text-anchor="middle">EXECUTE SCRIPT (0)</text>
+              </g>
+
+              <!-- 'Yes' Branch down to Inspect $1 -->
+              <line x1="470" y1="156" x2="470" y2="188" stroke="#4285F4" stroke-width="1.5" marker-end="url(#flowArrowBlue)"/>
+              <text x="478" y="174" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="700" fill="#4285F4">[Yes]</text>
+
+              <!-- Inspect $1 Node -->
+              <g transform="translate(370, 188)">
+                <rect width="200" height="44" rx="8" fill="#1e1e2e" stroke="#4285F4" stroke-width="2"/>
+                <text x="100" y="27" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" font-weight="700" fill="#e7e9ec" text-anchor="middle">INSPECT TOKEN $1</text>
+              </g>
+
+              <!-- Distribution Bus to Branches -->
+              <line x1="470" y1="232" x2="470" y2="258" stroke="#8a909b" stroke-width="1.5"/>
+              <line x1="75" y1="258" x2="865" y2="258" stroke="#8a909b" stroke-width="1.5"/>
+
+              <!-- Drop lines to each case -->
+              <line x1="75" y1="258" x2="75" y2="282" stroke="#8a909b" stroke-width="1.5" marker-end="url(#flowArrow)"/>
+              <line x1="225" y1="258" x2="225" y2="282" stroke="#8a909b" stroke-width="1.5" marker-end="url(#flowArrow)"/>
+              <line x1="385" y1="258" x2="385" y2="282" stroke="#8a909b" stroke-width="1.5" marker-end="url(#flowArrow)"/>
+              <line x1="550" y1="258" x2="550" y2="282" stroke="#8a909b" stroke-width="1.5" marker-end="url(#flowArrow)"/>
+              <line x1="705" y1="258" x2="705" y2="282" stroke="#8a909b" stroke-width="1.5" marker-end="url(#flowArrow)"/>
+              <line x1="865" y1="258" x2="865" y2="282" stroke="#8a909b" stroke-width="1.5" marker-end="url(#flowArrow)"/>
+
+              <!-- Branch 1: Help Flag (-h or help) -->
+              <g transform="translate(15, 282)">
+                <rect width="120" height="52" rx="6" fill="#1e1e2e" stroke="#313244"/>
+                <text x="60" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="700" fill="#fdd663" text-anchor="middle">-h | --help</text>
+                <text x="60" y="38" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="10" fill="#a7adb6" text-anchor="middle">Print usage synopsis</text>
+              </g>
+              <line x1="75" y1="334" x2="75" y2="368" stroke="#34A853" stroke-width="1.5" marker-end="url(#flowArrowGreen)"/>
+              <g transform="translate(15, 368)">
+                <rect width="120" height="34" rx="17" fill="rgba(52, 168, 83, 0.15)" stroke="#34A853" stroke-width="1.5"/>
+                <text x="60" y="21" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="700" fill="#34A853" text-anchor="middle">exit 0</text>
+              </g>
+
+              <!-- Branch 2: Profile Switch (-l or -c) -->
+              <g transform="translate(155, 282)">
+                <rect width="140" height="52" rx="6" fill="#1e1e2e" stroke="#313244"/>
+                <text x="70" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="700" fill="#8ab4f8" text-anchor="middle">-l | -c | --cloud</text>
+                <text x="70" y="38" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="10" fill="#a7adb6" text-anchor="middle">Set TARGET profile</text>
+              </g>
+              <line x1="225" y1="334" x2="225" y2="368" stroke="#4285F4" stroke-width="1.5" marker-end="url(#flowArrowBlue)"/>
+              <g transform="translate(165, 368)">
+                <rect width="120" height="34" rx="6" fill="#1a1e24" stroke="#4285F4" stroke-width="1.5"/>
+                <text x="60" y="21" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="700" fill="#8ab4f8" text-anchor="middle">shift 1</text>
+              </g>
+
+              <!-- Branch 3: Valued Flag with Space (-p port) -->
+              <g transform="translate(315, 282)">
+                <rect width="140" height="52" rx="6" fill="#1e1e2e" stroke="#313244"/>
+                <text x="70" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="700" fill="#8ab4f8" text-anchor="middle">-p | --port</text>
+                <text x="70" y="38" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="10" fill="#a7adb6" text-anchor="middle">Check $2; PORT=$2</text>
+              </g>
+              <line x1="385" y1="334" x2="385" y2="368" stroke="#4285F4" stroke-width="1.5" marker-end="url(#flowArrowBlue)"/>
+              <g transform="translate(325, 368)">
+                <rect width="120" height="34" rx="6" fill="#1a1e24" stroke="#4285F4" stroke-width="1.5"/>
+                <text x="60" y="21" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="700" fill="#8ab4f8" text-anchor="middle">shift 2</text>
+              </g>
+
+              <!-- Branch 4: Valued Flag with Equals (port=val) -->
+              <g transform="translate(480, 282)">
+                <rect width="140" height="52" rx="6" fill="#1e1e2e" stroke="#313244"/>
+                <text x="70" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="700" fill="#8ab4f8" text-anchor="middle">--port=*</text>
+                <text x="70" y="38" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="10" fill="#a7adb6" text-anchor="middle">PORT=${1#*=}</text>
+              </g>
+              <line x1="550" y1="334" x2="550" y2="368" stroke="#4285F4" stroke-width="1.5" marker-end="url(#flowArrowBlue)"/>
+              <g transform="translate(490, 368)">
+                <rect width="120" height="34" rx="6" fill="#1a1e24" stroke="#4285F4" stroke-width="1.5"/>
+                <text x="60" y="21" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="700" fill="#8ab4f8" text-anchor="middle">shift 1</text>
+              </g>
+
+              <!-- Branch 5: End of Options Delimiter -->
+              <g transform="translate(645, 282)">
+                <rect width="120" height="52" rx="6" fill="#1e1e2e" stroke="#313244"/>
+                <text x="60" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="700" fill="#fdd663" text-anchor="middle">--</text>
+                <text x="60" y="38" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="10" fill="#a7adb6" text-anchor="middle">End of Options</text>
+              </g>
+              <line x1="705" y1="334" x2="705" y2="368" stroke="#FBBC05" stroke-width="1.5" marker-end="url(#flowArrow)"/>
+              <g transform="translate(645, 368)">
+                <rect width="120" height="34" rx="6" fill="#1a1e24" stroke="#FBBC05" stroke-width="1.5"/>
+                <text x="60" y="21" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" font-weight="700" fill="#fdd663" text-anchor="middle">shift 1; break</text>
+              </g>
+
+              <!-- Branch 6: Unknown flag * -->
+              <g transform="translate(805, 282)">
+                <rect width="120" height="52" rx="6" fill="#1e1e2e" stroke="#EA4335" stroke-width="1.5"/>
+                <text x="60" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="700" fill="#EA4335" text-anchor="middle">* (Unknown)</text>
+                <text x="60" y="38" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="10" fill="#f28b82" text-anchor="middle">Log error to stderr</text>
+              </g>
+              <line x1="865" y1="334" x2="865" y2="368" stroke="#EA4335" stroke-width="1.5" marker-end="url(#flowArrowRed)"/>
+              <g transform="translate(805, 368)">
+                <rect width="120" height="34" rx="17" fill="rgba(234, 67, 53, 0.15)" stroke="#EA4335" stroke-width="1.5"/>
+                <text x="60" y="21" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="700" fill="#EA4335" text-anchor="middle">exit 2</text>
+              </g>
+
+              <!-- Re-loop Collector Line -->
+              <line x1="225" y1="402" x2="225" y2="460" stroke="#4285F4" stroke-width="1.5"/>
+              <line x1="385" y1="402" x2="385" y2="460" stroke="#4285F4" stroke-width="1.5"/>
+              <line x1="550" y1="402" x2="550" y2="460" stroke="#4285F4" stroke-width="1.5"/>
+
+              <line x1="225" y1="460" x2="550" y2="460" stroke="#4285F4" stroke-width="1.5"/>
+
+              <!-- Long Loopback arrow up to Diamond -->
+              <path d="M 225 460 L 50 460 L 50 120 L 382 120" fill="none" stroke="#4285F4" stroke-width="1.5" stroke-dasharray="5 5" marker-end="url(#flowArrowBlue)"/>
+              <text x="60" y="450" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="700" fill="#8ab4f8">Re-evaluate next token ($# updated)</text>
+
+              <!-- Break connection from branch 5 into validation -->
+              <path d="M 705 402 L 705 435 L 770 435 L 770 148" fill="none" stroke="#FBBC05" stroke-width="1.5" marker-end="url(#flowArrow)"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- SECTION 7: COMPARISON MATRIX -->
+    <article class="step-card" id="comparison">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Section 7 · Architectural Evaluation</span>
+          <h2 class="step-title">Comparison Matrix: Selecting the Right Parsing Strategy</h2>
+        </div>
+        <span class="badge green">Decision Framework</span>
+      </div>
+      <div class="step-body">
+        <p>
+          Selecting a parsing methodology requires evaluating portability, flag complexity, user experience expectations, and maintenance overhead. The matrix below contrasts the three primary architectural strategies:
+        </p>
+
+        <div class="data-table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 22%;">Dimension</th>
+                <th style="width: 26%;">Approach 1 (Manual Loop)</th>
+                <th style="width: 26%;">Approach 2 (POSIX getopts)</th>
+                <th style="width: 26%;">Approach 3 (Universal Parser)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Portability</strong></td>
+                <td>High (Bash, Zsh, Dash, Ksh)</td>
+                <td><strong>Highest</strong> (Strict POSIX Standard)</td>
+                <td>High (Bash 3.2+, Zsh, macOS, Linux)</td>
+              </tr>
+              <tr>
+                <td><strong>Long Flags (<code>--cloud</code>)</strong></td>
+                <td><span class="comparison-check">✓</span> Native and simple</td>
+                <td><span class="comparison-cross">✗</span> Not natively supported</td>
+                <td><span class="comparison-check">✓</span> <strong>Native &amp; Ergonomic</strong></td>
+              </tr>
+              <tr>
+                <td><strong>Short Flags (<code>-c</code>)</strong></td>
+                <td><span class="comparison-check">✓</span> Supported via aliases</td>
+                <td><span class="comparison-check">✓</span> <strong>Native with auto-clustering</strong></td>
+                <td><span class="comparison-check">✓</span> Supported via dual patterns</td>
+              </tr>
+              <tr>
+                <td><strong>Flag Clustering (<code>-lc</code>)</strong></td>
+                <td><span class="comparison-cross">✗</span> Requires manual tokenizer</td>
+                <td><span class="comparison-check">✓</span> <strong>Automatic &amp; Builtin</strong></td>
+                <td><span class="comparison-cross">✗</span> Requires sub-loop or discrete flags</td>
+              </tr>
+              <tr>
+                <td><strong>Inline Equals (<code>--port=3000</code>)</strong></td>
+                <td><span class="comparison-check">✓</span> Supported via <code>${1#*=}</code></td>
+                <td><span class="comparison-cross">✗</span> Not supported</td>
+                <td><span class="comparison-check">✓</span> <strong>Supported via <code>${1#*=}</code></strong></td>
+              </tr>
+              <tr>
+                <td><strong>macOS vs. Linux Parity</strong></td>
+                <td><span class="comparison-check">✓</span> 100% Identical</td>
+                <td><span class="comparison-check">✓</span> 100% Identical</td>
+                <td><span class="comparison-check">✓</span> <strong>100% Identical (Zero BSD bugs)</strong></td>
+              </tr>
+              <tr>
+                <td><strong>External Dependencies</strong></td>
+                <td>None (Pure shell syntax)</td>
+                <td>None (Shell builtin)</td>
+                <td>None (Pure shell syntax)</td>
+              </tr>
+              <tr>
+                <td><strong>Implementation Verbosity</strong></td>
+                <td>Low (25–35 lines)</td>
+                <td>Low (20–30 lines)</td>
+                <td>Moderate (50–70 lines)</td>
+              </tr>
+              <tr>
+                <td><strong>Recommended Usage</strong></td>
+                <td>Small internal scripts with only long flags</td>
+                <td>Strict POSIX system utilities with short flags only</td>
+                <td><strong>Team development scripts (<code>run-frontend.sh</code>)</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </article>
+
+    <!-- SECTION 8: ERROR HANDLING & DEFENSIVE VALIDATION -->
+    <article class="step-card" id="error-handling">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Section 8 · Defensive Scripting</span>
+          <h2 class="step-title">Production Error Handling, Exit Codes &amp; Diagnostic Messages</h2>
+        </div>
+        <span class="badge yellow">Defensive Engineering</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🛑</span> POSIX Exit Code Semantics</div>
+          <p>
+            Well-behaved CLI scripts communicate outcome states through exit codes. Many developers erroneously return <code>exit 1</code> for all failure conditions. In production automation, distinguishing between invocation syntax errors and runtime failures is critical:
+          </p>
+          <ul>
+            <li><code>exit 0</code>: Successful completion, or explicit termination after printing documentation (e.g., <code>--help</code>, <code>-v</code>).</li>
+            <li><code>exit 1</code>: General operational failure (e.g., backend service down, missing metadata file, network timeout).</li>
+            <li><code>exit 2</code>: <strong>Command-Line Syntax Error</strong> (e.g., unrecognized flag, missing required argument value, invalid port range). This matches the POSIX standard established by utilities like <code>grep</code>, <code>sed</code>, and <code>awk</code>.</li>
+            <li><code>exit 127</code>: Command or executable not found (e.g., <code>npm</code> or <code>jq</code> missing from PATH).</li>
+          </ul>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🛡️</span> The Three Essential Validation Patterns</div>
+
+          <!-- Pattern 1 -->
+          <h3 style="font-size: 15px; margin: 18px 0 8px;">1. Missing Valued Argument Guard</h3>
+          <p>
+            When a flag expects an operand (<code>--port &lt;val&gt;</code>), verify that at least one additional token exists and that it does not accidentally match another flag:
+          </p>
+          <pre><code>if [[ $# -lt 2 || "$2" =~ ^- ]]; then
+  echo "Error: $1 requires an argument value." >&2
+  echo "Run '$0 --help' for usage." >&2
+  exit 2
+fi</code></pre>
+
+          <!-- Pattern 2 -->
+          <h3 style="font-size: 15px; margin: 18px 0 8px;">2. Type and Value Boundary Constraints</h3>
+          <p>
+            Do not pass unvalidated strings directly to downstream processes. Validate data types and ranges before execution:
+          </p>
+          <pre><code># Validate that PORT is strictly numeric and within non-privileged TCP range
+if ! [[ "$PORT" =~ ^[0-9]+$ ]] || (( PORT &lt; 1024 || PORT > 65535 )); then
+  echo "Error: Invalid port '$PORT'. Must be an integer between 1024 and 65535." >&2
+  exit 2
+fi</code></pre>
+
+          <!-- Pattern 3 -->
+          <h3 style="font-size: 15px; margin: 18px 0 8px;">3. Beautiful, Actionable Usage Text</h3>
+          <p>
+            A high-quality <code>--help</code> synopsis prevents developer confusion by detailing usage patterns, descriptions, defaults, and concrete invocation examples:
+          </p>
+          <pre><code>usage() {
+  cat &lt;&lt; 'EOF'
+Usage: ./run-frontend.sh [OPTIONS]
+
+Launch the Social Spark CopilotKit Next.js frontend with explicit backend binding.
+
+Options:
+  -l, --local             Bind to local ADK backend (default: http://localhost:8000)
+  -c, --cloud             Bind to deployed Vertex AI Reasoning Engine using deployment_metadata.json
+  -p, --port &lt;port&gt;       Next.js HTTP listen port (default: 3000)
+  -h, --help              Show this help message and exit
+
+Environment Variables:
+  ADK_BACKEND_ORIGIN      Override target backend origin directly
+
+Examples:
+  ./run-frontend.sh                # Standard local development
+  ./run-frontend.sh --cloud        # Connect directly to Vertex AI Reasoning Engine
+  ./run-frontend.sh -c -p 3005     # Connect to cloud on custom port
+EOF
+  exit 0
+}</code></pre>
+        </div>
+      </div>
+    </article>
+
+    <!-- SECTION 9: REAL-WORLD CASE STUDY -->
+    <article class="step-card" id="case-study">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Section 9 · Production Implementation</span>
+          <h2 class="step-title">Social Spark Case Study: Upgrading run-frontend.sh</h2>
+        </div>
+        <span class="badge blue">Social Spark Architecture</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">💻</span> Grounding in the Repository Codebase</div>
+          <p>
+            To resolve the configuration drift discovered in Lab 1 Step 8, the Social Spark repository upgraded <code>run-frontend.sh</code> to implement <strong>Twelve-Factor Principle 3: Launch Profiles</strong> using the pure-Bash state machine design pattern.
+          </p>
+          <p>
+            The launcher defaults to <code>--local</code> (<code>http://localhost:8000</code>). When invoked with <code>--cloud</code>, it reads <code>deployment_metadata.json</code>, extracts the Reasoning Engine resource ID through a defensive multi-tier cascade (<code>jq</code> &rarr; <code>python3</code> &rarr; <code>sed</code>), resolves the Google Cloud regional API origin, and exports <code>ADK_BACKEND_ORIGIN</code>:
+          </p>
+
+          <div class="code-container">
+            <div class="code-header">
+              <span class="file-name">run-frontend.sh (Social Spark Implementation)</span>
+              <button class="copy-btn" onclick="copySnippet(this)">Copy Script</button>
+            </div>
+            <pre><code>#!/usr/bin/env bash
+# ==============================================================================
+# run-frontend.sh — Social Spark Next.js Frontend Launcher
+# Enforces Twelve-Factor Principle 3: Deterministic Launch Profiles
+# Compatible with macOS Darwin (Bash 3.2+) and Linux
+# ==============================================================================
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" &amp;&amp; pwd)"
+METADATA_FILE="$REPO_ROOT/deployment_metadata.json"
+
+PROFILE="local"
+
+usage() {
+  cat &lt;&lt; 'EOF'
+Usage: ./run-frontend.sh [OPTIONS]
+
+Launch the Social Spark CopilotKit Next.js frontend with explicit backend binding.
+
+Options:
+  --local, -l    Bind to local ADK backend (default: http://localhost:8000)
+  --cloud, -c    Bind to deployed Vertex AI Reasoning Engine using deployment_metadata.json
+  --help, -h     Show this help message and exit
+
+Environment Variables:
+  ADK_BACKEND_ORIGIN    Override target backend origin directly
+EOF
+  exit 0
+}
+
+# --- Pure-Bash CLI Argument Parsing ---
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --local|-l)
+      PROFILE="local"
+      shift
+      ;;
+    --cloud|-c)
+      PROFILE="cloud"
+      shift
+      ;;
+    --help|-h)
+      usage
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "Error: Unknown argument '$1'" >&2
+      echo "Run './run-frontend.sh --help' for usage." >&2
+      exit 1
+      ;;
+  esac
+done
+
+# --- Profile Resolution &amp; Binding ---
+if [[ "$PROFILE" == "cloud" ]]; then
+  if [[ ! -f "$METADATA_FILE" ]]; then
+    echo "Error: Cloud profile requested, but '$METADATA_FILE' was not found." >&2
+    echo "Deploy a Reasoning Engine first with 'agents-cli deploy'." >&2
+    exit 1
+  fi
+
+  # Extract remote_agent_runtime_id via defensive 3-tier cascade (jq -> python3 -> sed)
+  if command -v jq >/dev/null 2>&1; then
+    REMOTE_ID=$(jq -r '.remote_agent_runtime_id // empty' "$METADATA_FILE" 2>/dev/null || true)
+  elif command -v python3 >/dev/null 2>&1; then
+    REMOTE_ID=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('remote_agent_runtime_id', ''))" "$METADATA_FILE" 2>/dev/null || true)
+  else
+    REMOTE_ID=$(sed -n 's/.*"remote_agent_runtime_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$METADATA_FILE" 2>/dev/null || true)
+  fi
+
+  if [[ -z "$REMOTE_ID" ]]; then
+    echo "Error: 'remote_agent_runtime_id' is missing or empty in '$METADATA_FILE'." >&2
+    exit 1
+  fi
+
+  # Extract location from resource ID: projects/&lt;num&gt;/locations/&lt;location&gt;/reasoningEngines/&lt;id&gt;
+  LOCATION=$(echo "$REMOTE_ID" | cut -d'/' -f4)
+  if [[ -z "$LOCATION" ]]; then
+    echo "Error: Could not extract location from remote_agent_runtime_id: $REMOTE_ID" >&2
+    exit 1
+  fi
+
+  export ADK_BACKEND_ORIGIN="https://${LOCATION}-aiplatform.googleapis.com/reasoningEngines/v1/${REMOTE_ID}/api"
+  echo "=========================================================="
+  echo " [run-frontend] Profile: CLOUD (Vertex AI Reasoning Engine)"
+  echo " [run-frontend] Target:  $REMOTE_ID"
+  echo " [run-frontend] Origin:  $ADK_BACKEND_ORIGIN"
+  echo "=========================================================="
+else
+  export ADK_BACKEND_ORIGIN="http://localhost:8000"
+  echo "=========================================================="
+  echo " [run-frontend] Profile: LOCAL (:8000)"
+  echo " [run-frontend] Origin:  $ADK_BACKEND_ORIGIN"
+  echo "=========================================================="
+fi
+
+# --- Execution ---
+cd "$REPO_ROOT/frontend"
+npm install
+exec npm run dev</code></pre>
+          </div>
+
+          <div class="callout info">
+            <strong>The Defensive 3-Tier JSON Extraction Cascade:</strong> Notice lines 66–72 in <code>run-frontend.sh</code>. The script does not assume <code>jq</code> is installed. It attempts <code>jq</code> first; if absent, it falls back to Python 3's standard library <code>json</code> module; if Python is absent, it executes a regex extraction with <code>sed</code>. This guarantees seamless execution across minimal Alpine containers, Ubuntu build runners, and developer MacBooks alike.
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- SECTION 10: RELATED HUBS & BENTO NAVIGATION -->
+    <h2 style="font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 40px 0 16px;" id="cross-links">Related Architecture Documentation</h2>
+    <div class="bento">
+      <!-- Backend Binding Hub -->
+      <a class="tile span-6" href="backend-binding.html" style="border-left: 4px solid var(--accent);">
+        <div class="kicker">Architecture Walkthrough</div>
+        <div class="title">Twelve-Factor Backend Binding (Principles 1, 2, 3) →</div>
+        <div class="desc">
+          Explore the complete implementation of Fail-Closed Diagnostics in CopilotKit, the Visual Observability Badge in Next.js, and deterministic launch profiles in <code>run-frontend.sh</code>.
+        </div>
+        <div class="meta">
+          <span>Documentation Subpage</span>
+          <span class="badge blue">Architectural Guide</span>
+        </div>
+      </a>
+
+      <!-- Overview Hub -->
+      <a class="tile span-6" href="index.html" style="border-left: 4px solid var(--scale);">
+        <div class="kicker">Main Portfolio Hub</div>
+        <div class="title">Social Spark Engineering Walkthroughs →</div>
+        <div class="desc">
+          Navigate through the complete GDG London AI DevCamp portfolio covering Lab 1 (Agent Skills &amp; Composition), Lab 2 (Vertex AI Reasoning Engine), and Lab 3 (Govern &amp; Security Gateways).
+        </div>
+        <div class="meta">
+          <span>Overview Hub</span>
+          <span class="badge green">Portfolio Root</span>
+        </div>
+      </a>
+
+      <!-- Lab 1 Drifts -->
+      <a class="tile span-6" href="lab-1.html" style="border-left: 4px solid var(--govern);">
+        <div class="kicker">Pillar 1 · Build</div>
+        <div class="title">Lab 1 Walkthrough &amp; Configuration Drift Post-Mortem →</div>
+        <div class="desc">
+          Review Step 8's post-mortem detailing how multi-lab lifecycle configuration drift caused the 404 Reasoning Engine outage and how launch profiles solved it.
+        </div>
+        <div class="meta">
+          <span>Lab 1 Step 8</span>
+          <span class="badge yellow">Incident Analysis</span>
+        </div>
+      </a>
+
+      <!-- Attendee Learnings -->
+      <a class="tile span-6" href="learnings.html" style="border-left: 4px solid var(--optimise);">
+        <div class="kicker">Engineering Discoveries</div>
+        <div class="title">Attendee Learnings &amp; 20 Post-Mortems →</div>
+        <div class="desc">
+          Curated collection of 20 engineering insights spanning MCP collision resolutions, progressive skill disclosure, and surviving scale-to-zero memory evictions.
+        </div>
+        <div class="meta">
+          <span>Learnings Hub</span>
+          <span class="badge red">20 Discoveries</span>
+        </div>
+      </a>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <div>Social Spark Portfolio — GDG London AI DevCamp 2026 · Duncan Moncrieff</div>
+      <div>Maintained in <code>ai-devcamp-labs/docs/walkthrough/</code></div>
+    </footer>
+  </main>
+
+  <!-- Interactive Client Scripts -->
+  <script>
+    // Theme Switcher Logic
+    (function () {
+      var KEY = "social-spark-theme";
+      var root = document.documentElement;
+      var btn = document.getElementById("themeToggle");
+      function showing() {
+        return root.dataset.theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      }
+      if (btn) {
+        btn.addEventListener("click", function () {
+          var next = showing() === "dark" ? "light" : "dark";
+          root.dataset.theme = next;
+          try { localStorage.setItem(KEY, next); } catch (e) {}
+        });
+      }
+    })();
+
+    // Copy Code Snippet Helper
+    function copySnippet(button) {
+      var container = button.closest(".code-container");
+      var code = container.querySelector("pre code");
+      if (!code) return;
+      
+      navigator.clipboard.writeText(code.innerText).then(function () {
+        var originalText = button.innerText;
+        button.innerText = "Copied!";
+        button.style.background = "#34a853";
+        button.style.borderColor = "#34a853";
+        button.style.color = "#ffffff";
+        
+        setTimeout(function () {
+          button.innerText = originalText;
+          button.style.background = "";
+          button.style.borderColor = "";
+          button.style.color = "";
+        }, 2000);
+      }).catch(function (err) {
+        console.error("Clipboard copy failed: ", err);
+      });
+    }
+  </script>
+</body>
+</html>

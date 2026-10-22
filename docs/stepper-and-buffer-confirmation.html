@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>In-Flight Stepper Synchronization &amp; Single Confirmation Gate — Social Spark Walkthrough</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    try {
+      var t = localStorage.getItem("social-spark-theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+  <style>
+    .quick-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 20px 0 32px;
+      padding: 14px 18px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 13px;
+    }
+    .quick-nav-label {
+      font-weight: 700;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-right: 6px;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: .06em;
+    }
+    .quick-nav a {
+      color: var(--accent);
+      text-decoration: none;
+      padding: 3px 10px;
+      border-radius: 6px;
+      background: var(--accent-soft);
+      transition: all .15s ease;
+      font-size: 12.5px;
+      font-weight: 500;
+    }
+    .quick-nav a:hover {
+      background: var(--accent);
+      color: #ffffff;
+    }
+    .comparison-split {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      margin: 18px 0;
+    }
+    .flow-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+    }
+    .flow-card.problem {
+      border-top: 4px solid var(--red);
+    }
+    .flow-card.solution {
+      border-top: 4px solid var(--green);
+    }
+    .flow-card h4 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .flow-card ol {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-left">
+      <div class="brand-mark"></div>
+      <a href="index.html" class="nav-title">Social Spark — Attendee Portfolio</a>
+      <span class="nav-subtitle">Annexe: Stepper Sync &amp; Single Confirmation Gate</span>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html">Overview</a>
+      <a href="lab-1.html">Lab 1 (Build)</a>
+      <a href="lab-2.html">Lab 2 (Scale)</a>
+      <a href="lab-3.html">Lab 3 (Govern)</a>
+      <a href="learnings.html">Our Learnings</a>
+      <a href="backend-binding.html">Backend Binding</a>
+      <a href="shell-script-flags.html">CLI Flags</a>
+      <a href="stepper-and-buffer-confirmation.html" class="active">Stepper &amp; Confirmation</a>
+      <a href="https://sonikajanagill.com/ai-devcamp-labs/index.html" target="_blank" rel="noopener" class="upstream-pill">
+        Upstream Labs ↗
+      </a>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">🌗</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-meta">
+        <span class="badge blue">Lab 1 Step 9 Refinement</span>
+        <span class="badge green">UX &amp; State Reactivity</span>
+        <span class="badge purple">HITL Authorization</span>
+        <span>Baseline: <strong>POST_VIA=auto</strong></span>
+      </div>
+      <h1>In-Flight Stepper Synchronization &amp; The Single-Confirmation Gate</h1>
+      <p class="lead">
+        A deep architectural analysis and engineering record documenting how we eliminated subagent state progression lag in CopilotKit and prevented duplicate Human-in-the-Loop authorization prompts during Buffer MCP publishing.
+      </p>
+      <div class="callout info">
+        <strong>Context:</strong> Following the successful integration of multimodal image synthesis (<code>gemini-2.5-flash-image</code>), automatic GCS persistence, and Buffer MCP dispatch, live end-to-end verification uncovered two subtle friction points: the pipeline stepper remained visually frozen on <em>Researching</em> while <code>draft_agent</code> executed, and the user was required to confirm publication twice. Here is how we systematically resolved both.
+      </div>
+    </section>
+
+    <!-- Quick Navigation -->
+    <div class="quick-nav">
+      <span class="quick-nav-label">Jump to Section:</span>
+      <a href="#challenge-stepper-lag">1. Stepper Latency Gap</a>
+      <a href="#challenge-double-confirm">2. Double Confirmation Gate</a>
+      <a href="#post-via-invariant">3. POST_VIA=auto Invariant</a>
+      <a href="#evidence-gallery">4. Empirical Evidence</a>
+      <a href="#verification-matrix">5. Verification Matrix</a>
+    </div>
+
+    <!-- CHALLENGE 1: STEPPER LATENCY GAP -->
+    <article class="step-card" id="challenge-stepper-lag">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Challenge 1 · State Reactivity</span>
+          <h2 class="step-title">The ADK Event Lifecycle Paradox &amp; In-Flight Stage Synchronization</h2>
+        </div>
+        <span class="badge yellow">SSE Lifecycle</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> The Symptom &amp; Root Cause</div>
+          <p>
+            During multi-agent execution, attendees observed an unnatural visual desynchronization in the Social Spark dashboard (captured live in <strong>Figure 1</strong>):
+          </p>
+          <ul>
+            <li>In the bottom <strong>Agent Activity</strong> drawer, <code>research_agent</code> was marked as <code>done</code>, and <code>draft_agent</code> was actively marked as <code>running…</code>.</li>
+            <li>Yet at the top of the screen, the horizontal <strong>Pipeline Stepper</strong> remained stationary on <strong>Researching</strong>. Only when <code>draft_agent</code> finished its entire 15-second generation waterfall did the stepper jump directly to <strong>Approval</strong>, completely skipping the visible <strong>Drafting</strong> phase.</li>
+          </ul>
+          <p>
+            <strong>The Architectural Mechanism:</strong> Investigating the Google ADK and <code>ag-ui-adk</code> event lifecycle uncovered why server-side callbacks alone could not solve this:
+          </p>
+          <ul>
+            <li>In Google ADK, <code>before_tool_callback</code> runs synchronously in-process. While it successfully mutates <code>tool_context.state["pipeline_stage"] = "drafting"</code> in memory, <strong>ADK does not emit an SSE event when a tool begins execution</strong>.</li>
+            <li>ADK only yields <code>Event</code> objects containing <code>actions.state_delta</code> when a tool completes and returns a <code>FunctionResponse</code>, or at turn boundaries when emitting a final <code>STATE_SNAPSHOT</code>.</li>
+            <li>Consequently, CopilotKit's <code>useCoAgent({ name: "social_poster" })</code> hook receives zero state deltas while <code>draft_agent</code> is in flight, leaving <code>state.pipeline_stage</code> stuck on the value emitted when <code>research_agent</code> concluded (<code>researching</code>).</li>
+            <li>Conversely, <code>ActivityFeed.tsx</code> inspects <code>useCopilotChatInternal()</code>: as soon as the orchestrator emits a <code>FunctionCall</code> event, the streaming message array receives <code>toolCalls: [{function: {name: "draft_agent"}}]</code>, allowing it to render the running state immediately.</li>
+          </ul>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🛠️</span> The Solution: Dual-Source Reactive Stage Derivation</div>
+          <p>
+            We refactored <code>frontend/app/components/StagePanel.tsx</code> to read from both CopilotKit's shared state and the live streaming message feed:
+          </p>
+          <pre><code>// frontend/app/components/StagePanel.tsx
+function getActiveTool(messages: any[]): string | null {
+  const toolResults = new Set&lt;string&gt;();
+  for (const msg of messages) {
+    if (msg.role === "tool" &amp;&amp; msg.toolCallId) {
+      toolResults.add(msg.toolCallId);
+    }
+  }
+  for (let i = messages.length - 1; i &gt;= 0; i--) {
+    const msg = messages[i];
+    if (msg.role === "assistant" &amp;&amp; Array.isArray(msg.toolCalls)) {
+      for (let j = msg.toolCalls.length - 1; j &gt;= 0; j--) {
+        const call = msg.toolCalls[j];
+        if (call?.id &amp;&amp; !toolResults.has(call.id)) {
+          return call.function?.name ?? null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+export function StagePanel() {
+  const { state } = useCoAgent&lt;AgentState&gt;({ name: "social_poster" });
+  const { messages } = useCopilotChatInternal();
+
+  let current = state?.pipeline_stage ?? "idea";
+  const activeTool = getActiveTool((messages as any[]) ?? []);
+
+  // Bridge the in-flight subagent execution window
+  if (activeTool === "draft_agent") {
+    current = "drafting";
+  } else if (activeTool === "research_agent") {
+    current = "researching";
+  } else if (activeTool === "memory_agent" || activeTool === "load_memory") {
+    current = "consulting_memory";
+  }
+
+  const currentIdx = STAGES.findIndex((s) => s.key === current);
+  // ... render stepper ...
+}</code></pre>
+          <p>
+            <strong>Result:</strong> The instant the orchestrator dispatches <code>draft_agent</code>, the stepper reactively illuminates <strong>✍️ Drafting</strong> with zero latency. When drafting concludes, the server-emitted <code>awaiting_approval</code> state takes over smoothly.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <!-- CHALLENGE 2: DOUBLE CONFIRMATION GATE -->
+    <article class="step-card" id="challenge-double-confirm">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Challenge 2 · HITL Authorization</span>
+          <h2 class="step-title">The Premature Tool Execution Trap &amp; The Double Confirmation Gate</h2>
+        </div>
+        <span class="badge red">HITL Mechanics</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🔍</span> The Symptom &amp; Root Cause</div>
+          <p>
+            When authorizing a post scheduled for Buffer, attendees noticed that approving the action required clicking <strong>Approve</strong> twice (evidenced by duplicate <em>"Responded."</em> chips and stacked <code>adk_request_confirmation</code> spans in <strong>Figure 2</strong>).
+          </p>
+          <div class="comparison-split">
+            <div class="flow-card problem">
+              <h4>❌ The Double-Gate Failure Waterfall</h4>
+              <ol>
+                <li>User states: <em>"lets set this up for posting!"</em>.</li>
+                <li>Orchestrator invokes <code>create_post</code> optimistically without <code>channelId</code>.</li>
+                <li>ADK intercepts <code>create_post</code> (<code>require_confirmation=True</code>) &rarr; Prompts User.</li>
+                <li>User clicks <strong>Approve (#1)</strong>.</li>
+                <li>Buffer MCP executes <code>create_post</code> &rarr; Fails: <code>Missing required field: channelId</code>.</li>
+                <li>Orchestrator catches error, calls <code>get_account</code> &amp; <code>list_channels</code> to get channel ID.</li>
+                <li>Orchestrator invokes <code>create_post</code> with <code>channelId</code>.</li>
+                <li>ADK intercepts <code>create_post</code> again &rarr; Prompts User <strong>Approve (#2)</strong>!</li>
+              </ol>
+            </div>
+            <div class="flow-card solution">
+              <h4>✅ The Single-Gate Production Standard</h4>
+              <ol>
+                <li>User states: <em>"lets set this up for posting!"</em>.</li>
+                <li>Orchestrator obeys strict prerequisite: queries <code>get_account</code> &rarr; <code>list_channels</code>.</li>
+                <li>Primary <code>buffer_channel_id</code> cached in session state.</li>
+                <li>Orchestrator invokes <code>create_post</code> fully formed (with <code>channelId</code> and image asset).</li>
+                <li>ADK intercepts <code>create_post</code> &rarr; Prompts User <strong>Approve (Once)</strong>.</li>
+                <li>User clicks <strong>Approve</strong>.</li>
+                <li>Buffer MCP executes successfully on first attempt.</li>
+                <li>Post enters Buffer queue with zero redundant gates.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
+        <div class="part-section">
+          <div class="part-label"><span class="icon">🛡️</span> The Solution: Strict Prerequisites &amp; Session State Caching</div>
+          <p>
+            To eliminate the premature call, we implemented defense-in-depth across prompt engineering, state caching, and tool callbacks:
+          </p>
+          <ul>
+            <li><strong>Orchestrator Mandate:</strong> Updated <code>_BUFFER_CHANNEL_LOOKUP</code> and <code>root_agent.instruction</code> with a mandatory operational invariant:
+              <pre><code>MANDATORY BUFFER CHANNEL PRE-REQUISITE:
+Buffer's create_post REQUIRES a valid channelId. Calling create_post without channelId will fail immediately.
+BEFORE calling create_post, you MUST resolve the channelId yourself:
+  1. Call get_account (no arguments) to find organizationId.
+  2. Call list_channels with that organizationId.
+  3. Pass that channel's id as channelId in create_post. NEVER call create_post before list_channels.</code></pre>
+            </li>
+            <li><strong>Channel ID Caching in <code>_track_stage</code>:</strong> When <code>list_channels</code> runs, the callback extracts and caches the primary channel ID into <code>tool_context.state["buffer_channel_id"]</code>.</li>
+            <li><strong>Defensive Injection in <code>_delay_buffer_post</code>:</strong> If <code>create_post</code> is dispatched without <code>channelId</code>, the hook automatically injects the cached ID:
+              <pre><code>if tool.name == "create_post":
+    if not args.get("channelId") and tool_context:
+        cached_channel = tool_context.state.get("buffer_channel_id")
+        if cached_channel:
+            args["channelId"] = cached_channel
+            log.info("Auto-populated channelId for Buffer create_post: %s", cached_channel)</code></pre>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <!-- ARCHITECTURAL INVARIANT: POST_VIA=AUTO -->
+    <article class="step-card" id="post-via-invariant">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Core Architecture</span>
+          <h2 class="step-title">Preserving the <code>POST_VIA=auto</code> Architectural Innovation</h2>
+        </div>
+        <span class="badge blue">System Design</span>
+      </div>
+      <div class="step-body">
+        <div class="part-section">
+          <div class="part-label"><span class="icon">⚖️</span> The Lab 1 Upstream Workaround vs. Production Routing</div>
+          <p>
+            In the upstream Lab 1 curriculum (<code>docs/lab-1-build.html#step-7</code>), the guide advises:
+          </p>
+          <div class="callout warn">
+            <em>"With both LinkedIn's tool and a real Buffer key active together, every turn fails: 'Duplicate function declaration found: create_post'... Leave POST_VIA blank only if BUFFER_API_KEY is also blank; otherwise set it to buffer or linkedin explicitly in .env."</em>
+          </div>
+          <p>
+            As documented in <a href="learnings.html#issue-duplicate-tool">Learning 1</a>, setting <code>POST_VIA=buffer</code> or <code>linkedin</code> is an isolating workaround that turns off multi-platform capability. In our architecture:
+          </p>
+          <ul>
+            <li>We applied <code>tool_name_prefix="linkedin"</code> to the LinkedIn FastMCP toolsets, producing <code>linkedin_create_post</code> and <code>linkedin_get_profile</code>.</li>
+            <li>Buffer's remote MCP tools remain unprefixed (<code>create_post</code>, <code>list_channels</code>, <code>get_account</code>).</li>
+            <li>With zero namespace collisions, <code>POST_VIA=auto</code> enables the orchestrator to route indifferently based on user intent (immediate LinkedIn post vs. scheduling via Buffer).</li>
+          </ul>
+          <p>
+            <strong>Decision:</strong> <code>POST_VIA=auto</code> is maintained as an invariant baseline.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <!-- EMPIRICAL EVIDENCE GALLERY -->
+    <article class="step-card" id="evidence-gallery">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Evidence</span>
+          <h2 class="step-title">Authentic Verification Artifacts</h2>
+        </div>
+        <span class="badge green">Empirical Traces</span>
+      </div>
+      <div class="step-body">
+        <!-- Figure 1 -->
+        <figure class="evidence-figure">
+          <img src="screenshots/lab1-step9-buffer-stepper-lag.png" alt="Stepper Lag during Subagent Drafting" loading="lazy">
+          <figcaption>
+            <strong>Figure 1 — Stepper Lag Symptom (Empirical Evidence):</strong> Captured during initial testing. The Agent Activity drawer confirms <code>research_agent</code> is done and <code>draft_agent</code> is running, yet the top pipeline stepper remained stuck on <em>Researching</em>. This prompted our in-flight synchronization in <code>StagePanel.tsx</code>.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 2 -->
+        <figure class="evidence-figure" style="margin-top: 24px;">
+          <img src="screenshots/lab1-step9-buffer-double-confirmation.png" alt="Double Confirmation Gate in Activity Drawer" loading="lazy">
+          <figcaption>
+            <strong>Figure 2 — Duplicate Confirmation Spans (Empirical Evidence):</strong> Tracing the double-gate failure mode. A first <code>adk_request_confirmation</code> completed with <code>confirmed: true</code>, but because <code>create_post</code> lacked <code>channelId</code>, the model re-attempted the call, spawning a second active confirmation span.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 3 -->
+        <figure class="evidence-figure" style="margin-top: 24px;">
+          <img src="screenshots/lab1-step9-buffer-image-queue-verified.png" alt="Buffer Dashboard Queue with Generated Image" loading="lazy">
+          <figcaption>
+            <strong>Figure 3 — Successful Buffer Queue Ingestion with Multimodal Asset:</strong> Live Buffer dashboard (<code>publish.buffer.com</code>) in <em>DryTesting Company</em> verifying the final scheduled post with the high-resolution AI-generated illustration and custom scheduled time slot.
+          </figcaption>
+        </figure>
+
+        <!-- Figure 4 -->
+        <figure class="evidence-figure" style="margin-top: 24px;">
+          <img src="screenshots/lab1-step9-buffer-gcs-details-verified.png" alt="Google Cloud Storage Asset Object Details" loading="lazy">
+          <figcaption>
+            <strong>Figure 4 — Cloud Storage Persistent Asset Verification:</strong> Object details in Google Cloud Console for <code>lab2-bucket-ai-devcamp-duncan-395792/post-images/1792608140-57efc579.png</code> (1.5MB PNG), confirming end-to-end multimodal persistence.
+          </figcaption>
+        </figure>
+      </div>
+    </article>
+
+    <!-- VERIFICATION MATRIX -->
+    <article class="step-card" id="verification-matrix">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Verification</span>
+          <h2 class="step-title">Automated &amp; Runtime Verification Matrix</h2>
+        </div>
+        <span class="badge blue">Complete</span>
+      </div>
+      <div class="step-body">
+        <div class="tbl-wrap">
+          <table class="test-scenario-table">
+            <thead>
+              <tr>
+                <th>Test Scope</th>
+                <th>Target Component</th>
+                <th>Command / Probe</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Unit Tests</td>
+                <td>Scheduling, Auto-Channel, GCS URL Injection</td>
+                <td><code>uv run python -m pytest tests/</code></td>
+                <td><strong>30 / 30 Passed</strong> (1.52s)</td>
+              </tr>
+              <tr>
+                <td>Frontend Build</td>
+                <td>Next.js Turbopack + TypeScript Types</td>
+                <td><code>npm run build</code></td>
+                <td><strong>Compiled Successfully</strong> (0 errors)</td>
+              </tr>
+              <tr>
+                <td>Backend Health Probe</td>
+                <td>FastAPI OpenAPI Endpoint</td>
+                <td><code>curl -s http://localhost:8000/openapi.json</code></td>
+                <td><strong>HTTP 200 OK</strong></td>
+              </tr>
+              <tr>
+                <td>Frontend Status Badge</td>
+                <td>Backend Reachability API</td>
+                <td><code>curl -s http://localhost:3000/api/backend-status</code></td>
+                <td><code>{"origin":"http://localhost:8000","isLocal":true,"healthy":true}</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </article>
+
+    <!-- Footer -->
+    <footer>
+      <div><a href="index.html">← Back to Overview</a> | <a href="lab-1.html">View Lab 1 Walkthrough →</a> | <a href="learnings.html">View Our Learnings →</a></div>
+      <div>Maintained in <code>ai-devcamp-labs/docs/walkthrough/stepper-and-buffer-confirmation.html</code></div>
+    </footer>
+  </main>
+
+  <script src="lightbox.js"></script>
+  <script>
+    (function () {
+      var KEY = "social-spark-theme";
+      var root = document.documentElement;
+      var btn = document.getElementById("themeToggle");
+      function showing() {
+        return root.dataset.theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      }
+      if (btn) {
+        btn.addEventListener("click", function () {
+          var next = showing() === "dark" ? "light" : "dark";
+          root.dataset.theme = next;
+          try { localStorage.setItem(KEY, next); } catch (e) {}
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
