@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Duncan's Social Spark DevCamp Portfolio — GDG London</title>
+  <title>Social Spark — GDG London AI DevCamp 2026</title>
   <link rel="stylesheet" href="style.css">
   <script>
     try {
@@ -18,225 +18,167 @@
   <header class="navbar">
     <div class="nav-left">
       <div class="brand-mark"></div>
-      <a href="index.html" class="nav-title">Social Spark — Attendee Portfolio</a>
+      <a href="index.html" class="nav-title">Social Spark — Documentation Gateway</a>
       <span class="nav-subtitle">GDG London AI DevCamp 2026</span>
     </div>
     <nav class="nav-links">
-      <a href="index.html" class="active">Overview</a>
-      <a href="lab-1.html">Lab 1 (Build)</a>
-      <a href="lab-2.html">Lab 2 (Scale)</a>
-      <a href="lab-3.html">Lab 3 (Govern)</a>
-      <a href="learnings.html">Our Learnings</a>
-      <a href="backend-binding.html">Backend Binding</a>
-      <a href="shell-script-flags.html">CLI Flags</a>
-      <a href="stepper-and-buffer-confirmation.html">Stepper &amp; Confirmation</a>
-      <a href="https://sonikajanagill.com/ai-devcamp-labs/index.html" target="_blank" rel="noopener" class="upstream-pill">
-        Upstream Labs (Sonika Gill) ↗
-      </a>
+      <a href="index.html" class="active">Gateway</a>
+      <a href="instructor/index.html" class="companion-pill">👨‍🏫 Instructor Track ↗</a>
+      <a href="lab-1.html" class="companion-pill" style="background: var(--scale-soft); color: var(--scale); border-color: rgba(52, 168, 83, 0.25);">🛠️ Attendee Walkthrough ↗</a>
       <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">🌗</button>
     </nav>
   </header>
 
-  <main>
-    <!-- Hero -->
-    <section class="hero">
-      <div class="hero-meta">
+  <main style="max-width: 1080px; margin: 0 auto; padding: 40px 24px;">
+
+    <!-- Hero / Gateway Invitation -->
+    <section class="hero" style="text-align: center; margin-bottom: 36px; padding: 0;">
+      <div class="hero-meta" style="justify-content: center; margin-bottom: 12px;">
         <span class="badge blue">Google Agent Platform</span>
-        <span class="badge yellow">Lab 3: Govern Completed</span>
-        <span>Attendee: <strong>Duncan Moncrieff</strong></span>
+        <span class="badge green">Two Visitor Trips</span>
+        <span>Parallel Documentation Tracks</span>
       </div>
-      <h1>Social Spark — Engineering Portfolio &amp; Lab Walkthroughs</h1>
-      <p class="lead">
-        A hands-on implementation, architectural review, and security verification portfolio for <strong>Social Spark</strong> — an autonomous, multi-turn AI social media agent built on the <strong>Google Cloud Agent Development Kit (ADK)</strong> and <strong>Gemini Enterprise Agent Platform</strong>.
+      <h1 style="font-size: 38px; font-weight: 800; letter-spacing: -0.025em; margin: 0 0 14px;">Social Spark: Choose Your Path</h1>
+      <p class="lead" style="max-width: 760px; margin: 0 auto; color: var(--muted); font-size: 17px; line-height: 1.6;">
+        This repository documents the <strong>Social Spark</strong> autonomous social media agent built across all four pillars of the Google Agent Platform (Build, Scale, Govern, Optimise). Choose between the official workshop curriculum or explore the verified production-grade attendee walkthrough.
       </p>
     </section>
 
-    <!-- Platform 4 Pillars Grid -->
-    <h2 style="font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 14px;">The 4 Platform Pillars</h2>
-    <div class="bento">
+    <!-- Split-Gateway Dual-Doors (Matching Notebook Sketch) -->
+    <div class="gateway-doors">
 
-      <!-- Lab 1: Build -->
-      <a class="tile pillar-build" href="lab-1.html">
-        <div class="kicker">Pillar 1 · Build</div>
-        <div class="title">Lab 1 — Agent Composition &amp; Skills →</div>
-        <div class="desc">
-          Architecture of the ADK agent: prompt chaining, Agent Skills (<code>brand-voice</code>), toolsets (Google Search, SQLite, Buffer), and human-in-the-loop confirmation gating.
-        </div>
-        <div class="meta">
-          <span>Session 1 · Local &amp; Hybrid Execution</span>
-          <span class="badge blue">Completed</span>
-        </div>
-      </a>
-
-      <!-- Lab 2: Scale -->
-      <a class="tile pillar-scale" href="lab-2.html">
-        <div class="kicker">Pillar 2 · Scale</div>
-        <div class="title">Lab 2 — Agent Runtime &amp; Durable Memory →</div>
-        <div class="desc">
-          Deploying to Vertex AI Reasoning Engine with cryptographic Agent Identity, durable multi-turn Sessions, Memory Bank distillation across scale-to-zero cycles, and Cloud Run streaming proxy.
-        </div>
-        <div class="meta">
-          <span>Session 2 · Vertex AI Reasoning Engine</span>
-          <span class="badge green">Completed</span>
-        </div>
-      </a>
-
-      <!-- Lab 3: Govern -->
-      <a class="tile pillar-govern" href="lab-3.html">
-        <div class="kicker">Pillar 3 · Govern</div>
-        <div class="title">Lab 3 — Multi-Layer Guardrails &amp; Network Gateways →</div>
-        <div class="desc">
-          Complete walkthrough of Model Armor, Cloud DLP boundary redaction, Agent Registry semantic tool discovery, Semantic Governance Policies, and Agent Gateway ingress edge defense.
-        </div>
-        <div class="meta">
-          <span>Session 3 · Steps 1–7 Verified + Proof</span>
-          <span class="badge yellow">Complete · In-Depth</span>
-        </div>
-      </a>
-
-      <!-- Lab 4: Optimise -->
-      <div class="tile pillar-optimise" style="opacity: 0.75; cursor: default;">
-        <div class="kicker">Pillar 4 · Optimise</div>
-        <div class="title">Lab 4 — Analytics, Golden Evals &amp; CI/CD</div>
-        <div class="desc">
-          Golden eval regression suites, BigQuery Agent Analytics, Cloud Trace telemetry, and eval-gated automated release pipelines.
-        </div>
-        <div class="meta">
-          <span>Session 4 · Upcoming</span>
-          <span class="badge red">Next Up</span>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Secondary Bento: Attendee Learnings & Architecture Overview -->
-    <h2 style="font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 14px;">Documentation Hubs</h2>
-    <div class="bento">
-
-      <!-- Attendee Learnings Hub -->
-      <a class="tile span-8" href="learnings.html" style="border-left: 4px solid var(--accent);">
-        <div class="kicker">Engineering Insights</div>
-        <div class="title">Attendee Learnings &amp; Architectural Discoveries →</div>
-        <div class="desc">
-          A curated repository of <strong>27 engineering post-mortems</strong> spanning Build, Scale, and Govern: resolving MCP tool declaration collisions, progressive skill disclosure verification, surviving scale-to-zero memory evictions, avoiding the Principle of Least Astonishment, Model Armor regional invariance, regional vs. multi-regional endpoint architecture, and in-flight stepper synchronization.
-        </div>
-        <div class="meta">
-          <span>Distinct from instructor notes in LEARNINGS.md</span>
-          <span style="font-weight: 600; color: var(--accent);">Read Learnings →</span>
-        </div>
-      </a>
-
-      <!-- Upstream Reference -->
-      <a class="tile span-4" href="https://sonikajanagill.com/ai-devcamp-labs/index.html" target="_blank" rel="noopener">
-        <div class="kicker">Upstream Reference</div>
-        <div class="title">Sonika Gill's Labs ↗</div>
-        <div class="desc">
-          Official lab material, starter repo code, original documentation, and instructor notes from Sonika Gill and the DevCamp team.
-        </div>
-        <div class="meta">
-          <span>External Link</span>
-          <span class="upstream-pill">sonikajanagill.com ↗</span>
-        </div>
-      </a>
-
-      <!-- Stepper & Buffer Confirmation Annexe Tile -->
-      <a class="tile span-12" href="stepper-and-buffer-confirmation.html" style="border-left: 4px solid var(--accent);">
-        <div class="kicker">Observability &amp; HITL Mechanics</div>
-        <div class="title">In-Flight Stepper Synchronization &amp; Single Confirmation Gate →</div>
-        <div class="desc">
-          Root cause analysis, interactive sequence flows, and code diffs eliminating the ADK stepper latency gap and preventing duplicate human-in-the-loop confirmation prompts during Buffer MCP publishing.
-        </div>
-        <div class="meta">
-          <span>Lab 1 Step 9 &amp; Learning 27 Annexe · Full Technical Post-Mortem</span>
-          <span style="font-weight: 600; color: var(--accent);">Read Annexe →</span>
-        </div>
-      </a>
-
-      <!-- Twelve-Factor Backend Binding Tile -->
-      <a class="tile span-6" href="backend-binding.html" style="border-left: 4px solid var(--build);">
-        <div class="kicker">Architecture &amp; Runbook</div>
-        <div class="title">Twelve-Factor Backend Binding (Principles 1–3) →</div>
-        <div class="desc">
-          In-depth engineering review replacing speculative auto-discovery anti-patterns with deterministic binding: fail-closed diagnostics, visual observability badge, and CLI launch profiles.
-        </div>
-        <div class="meta">
-          <span>Principles 1, 2, 3 · Fail-Closed Diagnostics</span>
-          <span style="font-weight: 600; color: var(--build);">Read Walkthrough →</span>
-        </div>
-      </a>
-
-      <!-- CLI Flags Educational Guide Tile -->
-      <a class="tile span-6" href="shell-script-flags.html" style="border-left: 4px solid var(--scale);">
-        <div class="kicker">DevOps Educational Guide</div>
-        <div class="title">Adapting Shell Scripts for CLI Flags →</div>
-        <div class="desc">
-          Comprehensive standalone guide exploring the shift stack, POSIX getopts, long-flag parsing loops, and robust error validation for Google Cloud CLI workflows.
-        </div>
-        <div class="meta">
-          <span>Educational Tutorial · POSIX &amp; GNU/BSD</span>
-          <span style="font-weight: 600; color: var(--scale);">Explore Guide →</span>
-        </div>
-      </a>
-
-    </div>
-
-    <!-- System Architecture Diagram Card -->
-    <section class="step-card" style="margin-top: 20px;">
-      <div class="step-header">
+      <!-- Left Door: Instructor Workshop Track -->
+      <div class="gateway-card instructor">
         <div>
-          <span class="step-num">Architecture Overview</span>
-          <h3 class="step-title">Social Spark Production Governance Topology</h3>
+          <span class="gateway-badge blue">Track 1 · Workshop Curriculum</span>
+          <h2 class="gateway-title">Instructor Curriculum &amp; Starter Blueprint</h2>
+          <div class="gateway-author">Authored by <strong>Sonika Janagill</strong> (GDG London DevCamp Lead)</div>
+          <p class="gateway-desc">
+            The official GDG London workshop reference implementation, starter architectures, runbooks, and codelabs across all 4 DevCamp pillars. Features pedagogical error demonstrations and foundational setup guides.
+          </p>
+          <ul class="gateway-features">
+            <li><span>📘</span> <strong>4 Platform Pillars:</strong> Build, Scale, Govern, and Optimise</li>
+            <li><span>🚀</span> <strong>Pre-flight Onboarding:</strong> Complete Cloud project &amp; Antigravity setup</li>
+            <li><span>🔍</span> <strong>Instructor Insights:</strong> Author's pre-flight notes in <code>LEARNINGS.md</code></li>
+            <li><span>🎯</span> <strong>Curriculum Blueprints:</strong> Architectural diagrams and demo scripts</li>
+          </ul>
         </div>
+        <a href="instructor/index.html" class="gateway-btn blue">
+          <span>Explore Instructor Track</span>
+          <span>→</span>
+        </a>
       </div>
-      <div class="step-body">
-        <p style="margin-top: 0; color: var(--muted); font-size: 14px;">
-          The diagram below illustrates how traffic routes through the multi-layer security architecture implemented across Labs 1 through 3:
-        </p>
-        <pre style="line-height: 1.5; font-size: 12px;">
-                                 [External Client / Attackers]
-                                               │
-                       ┌───────────────────────┴───────────────────────┐
-                       │                                               │
-             (Native Protocols)                                 (Web Frontend)
-        streamQuery / MCP / A2A                                     AG-UI
-                       │                                               │
-                       ▼                                               ▼
-         ┌───────────────────────────┐                   ┌───────────────────────────┐
-         │       Agent Gateway       │                   │    Cloud Run Frontend     │
-         │     (agw-social-spark)    │                   │   (social-spark-frontend) │
-         └─────────────┬─────────────┘                   └─────────────┬─────────────┘
-                       │                                               │
-                Service Extension                                  POST /api/adk
-             (Model Armor Ingress)                                     │
-           [failOpen: false / 5s]                                      ▼
-                       │                                 ┌───────────────────────────┐
-            403 on Injection (Edge Drop)                 │     Inbound DLP Filter    │
-                       │                                 │ (pii_middleware: Domestic)│
-                       ▼                                 └─────────────┬─────────────┘
-         ┌───────────────────────────┐                                 │
-         │  Vertex AI Reasoning Eng. │                                 │
-         │  (social-spark-poster)    │◄────────────────────────────────┘
-         ├───────────────────────────┤
-         │ • In-Agent Model Armor    │ ─── Pre-execution callback catches UI injection
-         │ • Human Approval Gate     │ ─── require_confirmation=True prevents unapproved posts
-         │ • Agent Skills & Memory   │ ─── brand-voice, Vertex AI Sessions & Memory Bank
-         │ • Cryptographic Identity  │ ─── principal://agents.global... bound to Governance Policy
-         └─────────────┬─────────────┘
-                       │
-                       ▼
-         ┌───────────────────────────┐
-         │     External Services     │
-         │  (LinkedIn, Buffer, BQ)   │
-         └───────────────────────────┘
-        </pre>
+
+      <!-- Right Door: Duncan's Engineering Portfolio -->
+      <div class="gateway-card attendee">
+        <div>
+          <span class="gateway-badge green">Track 2 · Attendee Implementation</span>
+          <h2 class="gateway-title">Attendee Walkthrough &amp; Engineering Portfolio</h2>
+          <div class="gateway-author">Authored by <strong>Duncan Moncrieff</strong> (DevCamp Attendee)</div>
+          <p class="gateway-desc">
+            A 100% empirically verified, production-grade implementation featuring 7 Architectural Decision Records (ADRs), 27+ engineering post-mortems, 85+ authentic console traces, and dedicated architectural deep-dives.
+          </p>
+          <ul class="gateway-features">
+            <li><span>✅</span> <strong>100% Verified Proof:</strong> 85+ authentic screenshots &amp; logs (Labs 1–3)</li>
+            <li><span>🏛️</span> <strong>7 ADRs:</strong> Pure-ASGI DLP, V4 signed URLs, dual-routing, POLA CLI</li>
+            <li><span>💡</span> <strong>27+ Post-Mortems:</strong> Production bug resolutions &amp; enterprise gotchas</li>
+            <li><span>📐</span> <strong>Engineering Guides:</strong> Twelve-Factor Backend Binding &amp; Shell CLI Flags</li>
+          </ul>
+        </div>
+        <a href="lab-1.html" class="gateway-btn green">
+          <span>Explore Attendee Walkthrough</span>
+          <span>→</span>
+        </a>
       </div>
+
+    </div>
+
+    <!-- Quick Lab Directory Table -->
+    <section style="margin-top: 50px;">
+      <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.01em;">Parallel Lab Directory</h2>
+      <p style="color: var(--muted); font-size: 14px; margin-bottom: 20px;">
+        Jump directly to any pillar in either track. While browsing, you can switch back and forth at any time via the companion button in the top navigation bar.
+      </p>
+
+      <div class="tbl-wrap" style="border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--panel);">
+        <table style="margin: 0;">
+          <thead>
+            <tr>
+              <th style="width: 22%;">Platform Pillar</th>
+              <th style="width: 32%;">👨‍🏫 Instructor Track (Curriculum)</th>
+              <th style="width: 32%;">🛠️ Attendee Track (Walkthrough)</th>
+              <th style="width: 14%;">Verification</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Pillar 1: Build</strong><br><small style="color: var(--muted);">Agent Composition, Skills, Tools</small></td>
+              <td><a href="instructor/lab-1-build.html" style="font-weight: 600; color: var(--accent);">Lab 1: Build Guide →</a></td>
+              <td><a href="lab-1.html" style="font-weight: 600; color: var(--scale);">Lab 1 Walkthrough (26 Figures) →</a></td>
+              <td><span class="badge blue">9 / 9 Verified</span></td>
+            </tr>
+            <tr>
+              <td><strong>Pillar 2: Scale</strong><br><small style="color: var(--muted);">Reasoning Engine, Sessions, Memory</small></td>
+              <td><a href="instructor/lab-2-scale.html" style="font-weight: 600; color: var(--accent);">Lab 2: Scale Guide →</a></td>
+              <td><a href="lab-2.html" style="font-weight: 600; color: var(--scale);">Lab 2 Walkthrough (12 Figures) →</a></td>
+              <td><span class="badge green">9 / 9 Verified</span></td>
+            </tr>
+            <tr>
+              <td><strong>Pillar 3: Govern</strong><br><small style="color: var(--muted);">Model Armor, Cloud DLP, Gateway</small></td>
+              <td><a href="instructor/lab-3-govern.html" style="font-weight: 600; color: var(--accent);">Lab 3: Govern Guide →</a></td>
+              <td><a href="lab-3.html" style="font-weight: 600; color: var(--scale);">Lab 3 Walkthrough (8 Figures) →</a></td>
+              <td><span class="badge yellow">9 / 9 Verified</span></td>
+            </tr>
+            <tr>
+              <td><strong>Pillar 4: Optimise</strong><br><small style="color: var(--muted);">Golden Evals, Analytics, Flywheel</small></td>
+              <td><a href="instructor/lab-4-optimize.html" style="font-weight: 600; color: var(--accent);">Lab 4: Optimise Guide →</a></td>
+              <td><a href="https://github.com/duncmon/ai-devcamp-labs/blob/duncan-lab3/PROGRESS.md#6-lab-4-optimise--audit-verification-checkpoints--action-plan" style="font-weight: 600; color: var(--optimise);">Lab 4 Action Plan (9 Steps) →</a></td>
+              <td><span class="badge red">Active</span></td>
+            </tr>
+            <tr>
+              <td><strong>Engineering Insights</strong><br><small style="color: var(--muted);">Post-Mortems &amp; Discoveries</small></td>
+              <td><a href="instructor/doc-viewer.html?src=LEARNINGS.md" style="font-weight: 600; color: var(--accent);">Instructor LEARNINGS.md →</a></td>
+              <td><a href="learnings.html" style="font-weight: 600; color: var(--scale);">27 Empirical Post-Mortems →</a></td>
+              <td><span class="badge blue">27 Insights</span></td>
+            </tr>
+            <tr>
+              <td><strong>Architecture Guides</strong><br><small style="color: var(--muted);">Educational Deep-Dives</small></td>
+              <td><a href="instructor/doc-viewer.html?src=agent-runtime-deploy.md" style="font-weight: 600; color: var(--accent);">Agent Runtime Deploy →</a></td>
+              <td>
+                <a href="backend-binding.html" style="font-weight: 600; color: var(--scale);">Twelve-Factor Backend Binding →</a><br>
+                <a href="shell-script-flags.html" style="font-weight: 600; color: var(--scale);">Shell CLI Flags Parsing Guide →</a>
+              </td>
+              <td><span class="badge green">Complete</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Site Architecture & Philosophy Callout -->
+    <section style="margin-top: 48px; background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--accent); padding: 22px 26px; border-radius: 12px; box-shadow: var(--shadow);">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text);">Site Architecture &amp; Navigation Philosophy</h3>
+        <a href="site-design.html" style="font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none;">Read Full Architecture Philosophy →</a>
+      </div>
+      <p style="margin: 0 0 10px; font-size: 14px; color: var(--muted); line-height: 1.6;">
+        <strong>Why Two Distinct Visitor Trips?</strong> Rather than compressing the instructor's tutorial narrative and the attendee's technical dissection into an unwieldy side-by-side layout, this site treats them as two parallel, standalone tracks. Each page gives the reader complete, uninterrupted immersion in its respective context.
+      </p>
+      <p style="margin: 0; font-size: 14px; color: var(--muted); line-height: 1.6;">
+        <strong>The Universal 1-Click Companion Bridge:</strong> Every lab page features a persistent companion button in its navigation header. When reading the instructor guide for Lab 2, Duncan's Lab 2 walkthrough is exactly one click away. When reading the attendee post-mortem for Lab 2, Sonika's original notes are one click away.
+      </p>
     </section>
 
     <!-- Footer -->
     <footer>
-      <div>Social Spark Portfolio — GDG London AI DevCamp 2026 · Duncan Moncrieff</div>
-      <div>Maintained in <code>ai-devcamp-labs/docs/walkthrough/</code></div>
+      <div>
+        Running locally: <code>cd docs &amp;&amp; python -m http.server 8080</code>, then open <a href="http://localhost:8080/" style="color: var(--accent);">localhost:8080</a> (or <a href="http://localhost:8080/instructor/" style="color: var(--accent);">localhost:8080/instructor/</a>).
+      </div>
+      <div>
+        Live GitHub Pages: <a href="https://duncmon.github.io/ai-devcamp-labs/" style="color: var(--accent);">duncmon.github.io/ai-devcamp-labs/</a>
+      </div>
     </footer>
+
   </main>
 
   <script>
@@ -245,15 +187,23 @@
       var root = document.documentElement;
       var btn = document.getElementById("themeToggle");
       function showing() {
-        return root.dataset.theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        return root.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
       }
-      if (btn) {
-        btn.addEventListener("click", function () {
-          var next = showing() === "dark" ? "light" : "dark";
-          root.dataset.theme = next;
-          try { localStorage.setItem(KEY, next); } catch (e) {}
-        });
+      function paint() {
+        var s = showing();
+        btn.textContent = s === "dark" ? "☀️" : "🌙";
+        btn.title = s === "dark" ? "Switch to light" : "Switch to dark";
       }
+      btn.addEventListener("click", function () {
+        var next = showing() === "dark" ? "light" : "dark";
+        root.dataset.theme = next;
+        try { localStorage.setItem(KEY, next); } catch (e) {}
+        paint();
+      });
+      matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+        if (!root.dataset.theme) paint();
+      });
+      paint();
     })();
   </script>
 </body>

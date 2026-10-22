@@ -168,15 +168,20 @@ The instructor's reference material for Lab 4 introduces several core architectu
 
 ---
 
-## 8. GitHub Pages Site Deployment Guide
+## 8. GitHub Pages Site Deployment & Navigation Architecture
 
-The documentation repository is structured to publish Duncan's Walkthrough Portfolio directly via GitHub Pages:
+The documentation repository is structured to publish directly via GitHub Pages, featuring a **Split-Gateway Portal** and **Universal 1-Click Cross-Branch Switcher**:
 
-### Repository Architecture
+### Repository & Site Architecture
 * **Published Directory**: `/docs` (Root of the published site).
-* **Duncan's Walkthrough Portfolio**: Hosted at `/docs/index.html` with subpages `docs/lab-1.html`, `docs/lab-2.html`, `docs/lab-3.html`, `docs/learnings.html`, `docs/backend-binding.html`, `docs/shell-script-flags.html`, `docs/stepper-and-buffer-confirmation.html`.
+* **Split-Gateway Homepage**: Hosted at `/docs/index.html`, translating the attendee whiteboard sketch into a clean two-door choice between the *Instructor Workshop Track* and *Duncan's Engineering Portfolio*, accompanied by a parallel quick directory table.
+* **Duncan's Walkthrough Portfolio**: Subpages `docs/lab-1.html`, `docs/lab-2.html`, `docs/lab-3.html`, `docs/learnings.html`, `docs/backend-binding.html`, `docs/shell-script-flags.html`, `docs/stepper-and-buffer-confirmation.html`.
+* **Upstream Instructor Archive**: Fully unlocked and preserved under `docs/instructor/` (synced from tag `pillar-optimize`), accessible at `https://duncmon.github.io/ai-devcamp-labs/instructor/`.
+* **Universal 1-Click Cross-Branch Switcher**:
+  * On Attendee pages: Navbar companion pill (`[ 📖 Instructor Lab X Guide ↗ ]`) jumping straight to `instructor/lab-X.html`.
+  * On Instructor pages: Top content ribbon (`[ 🛠️ View Duncan's Realised Walkthrough (Proof & ADRs) ↗ ]`) jumping straight to `../lab-X.html`.
+* **Site Design Choices & Philosophy**: Authored in [`docs/site-design.html`](docs/site-design.html) detailing the "Two Visitor Trips" philosophy, information architecture rationale, and POLA static engineering.
 * **Asset Resolution**: All screenshots reside in `docs/screenshots/` and resolve via relative paths `screenshots/<filename>.png`.
-* **Upstream Instructor Archive**: Fully preserved under `docs/instructor/` and accessible at `https://duncmon.github.io/ai-devcamp-labs/instructor/`.
 * **Jekyll Bypass**: `.nojekyll` files reside in both `docs/.nojekyll` and `docs/walkthrough/.nojekyll`.
 
 ### Required GitHub Settings
@@ -195,16 +200,18 @@ The documentation repository is structured to publish Duncan's Walkthrough Portf
 ```mermaid
 flowchart TD
     T0["Phase 1: Retire PROJECT.md & Sync Lab 4 Docs [COMPLETED]"] --> T1["Phase 2: Reorganize docs/ for GitHub Pages [COMPLETED]"]
-    T1 --> T2["Phase 3: Rewrite README.md with Frontend CLI Flags & Clear Distinctions [COMPLETED]"]
-    T2 --> T3["Phase 4: Run Lab 4 Step 1 (Baseline Golden Eval) [NEXT]"]
-    T3 --> T4["Phase 5: Run Lab 4 Step 2 (Golden Set Hardening & Exit-Code Trap)"]
-    T4 --> T5["Phase 6: Run Lab 4 Step 3 (Simulated Users evals/simulate.py)"]
-    T5 --> T6["Phase 7: Run Lab 4 Step 4 (Model Right-Sizing Matrix)"]
-    T6 --> T7["Phase 8: Run Lab 4 Step 5 (BigQuery Analytics & Trace Spans)"]
-    T7 --> T8["Phase 9: Run Lab 4 Step 6 (Eval-Gated Cloud Build Deploy)"]
-    T8 --> T9["Phase 10: Run Lab 4 Step 7 (Budget Alert & Live Post Safeguard)"]
-    T9 --> T10["Phase 11: Run Lab 4 Step 8 (Rowing Coach Custom Agent Evals)"]
-    T10 --> T11["Phase 12: Run Lab 4 Step 9 (Teardown & Final Spend Audit)"]
+    T1 --> T2["Phase 3: Rewrite README.md [COMPLETED]"]
+    T2 --> T3["Phase 4: Split-Gateway Portal & Cross-Branch Switcher [COMPLETED]"]
+    T3 --> T4["Phase 5: Document Site Design Choices & Philosophy [COMPLETED]"]
+    T4 --> T5["Phase 6: Run Lab 4 Step 1 Baseline Golden Eval [NEXT]"]
+    T5 --> T6["Phase 7: Run Lab 4 Step 2 Golden Set Hardening & Exit-Code Trap"]
+    T6 --> T7["Phase 8: Run Lab 4 Step 3 Simulated Users evals/simulate.py"]
+    T7 --> T8["Phase 9: Run Lab 4 Step 4 Model Right-Sizing Matrix"]
+    T8 --> T9["Phase 10: Run Lab 4 Step 5 BigQuery Analytics & Trace Spans"]
+    T9 --> T10["Phase 11: Run Lab 4 Step 6 Eval-Gated Cloud Build Deploy"]
+    T10 --> T11["Phase 12: Run Lab 4 Step 7 Budget Alert & Live Post Safeguard"]
+    T11 --> T12["Phase 13: Run Lab 4 Step 8 Rowing Coach Custom Agent Evals"]
+    T12 --> T13["Phase 14: Run Lab 4 Step 9 Teardown & Final Spend Audit"]
 ```
 
 #### Phase 1: Retire `PROJECT.md` & Sync Lab 4 Docs [COMPLETED]
@@ -213,5 +220,14 @@ flowchart TD
 #### Phase 2: Reorganize `docs/` for GitHub Pages [COMPLETED]
 * **Status:** ✅ **Completed**. Segregated instructor files into `docs/instructor/`, promoted walkthrough files to `docs/`, resolved screenshot links to `screenshots/`, created redirects in `docs/walkthrough/`, added `.nojekyll`.
 
-#### Phase 3: Rewrite `README.md` [IN PROGRESS]
-* **Status:** ⏳ **Executing**. Rewrite `ai-devcamp-labs/README.md` to cleanly contrast upstream curriculum from Duncan's portfolio, provide 4-pillar navigation, and document engineered frontend CLI flags (`--local` vs `--cloud`).
+#### Phase 3: Rewrite `README.md` [COMPLETED]
+* **Status:** ✅ **Completed**. Rewrote `ai-devcamp-labs/README.md` to cleanly contrast upstream curriculum from Duncan's portfolio, provided 4-pillar navigation, and documented engineered frontend CLI flags (`--local` vs `--cloud`).
+
+#### Phase 4: Split-Gateway Portal & Universal Cross-Branch Switcher [COMPLETED]
+* **Status:** ✅ **Completed**. Implemented `docs/index.html` Split-Gateway Portal with two prominent doors matching attendee sketch, quick parallel lab directory, and 1-click cross-branch companion switcher across all attendee and instructor lab subpages.
+
+#### Phase 5: Document Site Design Choices & Philosophy [COMPLETED]
+* **Status:** ✅ **Completed**. Authored [`docs/site-design.html`](docs/site-design.html) detailing the "Two Visitor Trips" philosophy, information architecture rationale, and POLA static engineering.
+
+#### Phase 6: Run Lab 4 Step 1 (Baseline Golden Eval) [NEXT]
+* **Status:** ⏳ **Queued Next**. Execute `./evals/run.sh` to establish baseline pass/fail metric (target: 5/5 PASSED, `All cases passed.`) and runtime. Capture Mandatory Figure 1.1.

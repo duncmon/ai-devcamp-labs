@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Site Design Choices &amp; Navigation Philosophy — Social Spark</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    try {
+      var t = localStorage.getItem("social-spark-theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-left">
+      <div class="brand-mark"></div>
+      <a href="index.html" class="nav-title">Social Spark — Attendee Portfolio</a>
+      <span class="nav-subtitle">Site Design &amp; Architecture Philosophy</span>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html">Overview</a>
+      <a href="lab-1.html">Lab 1 (Build)</a>
+      <a href="lab-2.html">Lab 2 (Scale)</a>
+      <a href="lab-3.html">Lab 3 (Govern)</a>
+      <a href="learnings.html">Our Learnings</a>
+      <a href="backend-binding.html">Backend Binding</a>
+      <a href="shell-script-flags.html">CLI Flags</a>
+      <a href="site-design.html" class="active">Site Design</a>
+      <a href="instructor/index.html" class="companion-pill">👨‍🏫 Instructor Track ↗</a>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">🌗</button>
+    </nav>
+  </header>
+
+  <main style="max-width: 900px; margin: 0 auto; padding: 40px 24px;">
+
+    <!-- Breadcrumb Navigation -->
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+      <ol>
+        <li><a href="index.html">Documentation Hub</a></li>
+        <li aria-current="page">Site Design Choices &amp; Philosophy</li>
+      </ol>
+    </nav>
+
+    <!-- Header -->
+    <section class="hero" style="margin-bottom: 32px;">
+      <div class="hero-meta">
+        <span class="badge blue">Information Architecture</span>
+        <span class="badge green">UX Philosophy</span>
+        <span class="badge yellow">Dual-Track Design</span>
+      </div>
+      <h1 style="font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 14px;">Site Design Choices, Navigation Philosophy &amp; Dual-Track IA</h1>
+      <p class="lead" style="color: var(--muted); font-size: 16.5px; line-height: 1.6;">
+        An architectural rationale documenting how this repository presents two distinct visitor trips — the upstream instructor curriculum and Duncan's verified engineering portfolio — connected through a non-intrusive 1-click companion bridge.
+      </p>
+    </section>
+
+    <!-- Section 1: The Core Challenge -->
+    <section style="margin-bottom: 40px;">
+      <h2>1. The Problem: Two Incompatible Visitor Journeys</h2>
+      <p>
+        In many coding workshops, attendee repositories face a common information architecture dilemma:
+      </p>
+      <ul>
+        <li><strong>The Upstream Narrative:</strong> Authored by the workshop instructor (Sonika Janagill), it is pedagogical, prescriptive, and linear. It guides students through intentional stumbling blocks and starter code conventions.</li>
+        <li><strong>The Attendee Engineering Portfolio:</strong> Authored by the attendee (Duncan Moncrieff), it is critical, empirical, and architectural. It documents 7 custom Architectural Decision Records (ADRs), resolves production gotchas, audits telemetry traces, and implements production-grade security safeguards.</li>
+      </ul>
+      <p>
+        Attempting to merge both narratives into a single page or blending them together creates cognitive friction. A reader trying to follow the tutorial gets lost in advanced post-mortems; an engineer reviewing the production architecture gets bogged down in beginner codelab steps.
+      </p>
+    </section>
+
+    <!-- Section 2: The Two Visitor Trips Philosophy -->
+    <section style="margin-bottom: 40px;">
+      <h2>2. The "Two Visitor Trips" Philosophy</h2>
+      <p>
+        The core design principle adopted for this site is <strong>uncompromised immersion with instant cross-branch mobility</strong>:
+      </p>
+      <div class="bento" style="margin: 20px 0;">
+        <div class="tile span-6" style="border-top: 4px solid var(--accent);">
+          <div class="kicker">Trip A</div>
+          <div class="title">The Instructor Workshop Track</div>
+          <div class="desc">
+            Preserves the original GDG London DevCamp curriculum, codelabs, setup guides, and starter architecture blueprints in their authentic form under <code>docs/instructor/</code>.
+          </div>
+        </div>
+        <div class="tile span-6" style="border-top: 4px solid var(--scale);">
+          <div class="kicker">Trip B</div>
+          <div class="title">The Attendee Engineering Portfolio</div>
+          <div class="desc">
+            Provides a rigorous, fully verified engineering walkthrough with 85+ authentic trace figures, 7 ADRs, and 27 empirical post-mortems under <code>docs/</code>.
+          </div>
+        </div>
+      </div>
+      <p>
+        Rather than displaying side-by-side dual-column text (which cramps readable code blocks and diagrams), each reading page remains 100% focused on its respective track.
+      </p>
+    </section>
+
+    <!-- Section 3: The Split-Gateway Portal -->
+    <section style="margin-bottom: 40px;">
+      <h2>3. The Split-Gateway Portal (The Landing Experience)</h2>
+      <p>
+        The repository root page (<code>docs/index.html</code>) implements the <strong>Split-Gateway Portal</strong> based directly on attendee whiteboard conceptual sketches:
+      </p>
+      <ul>
+        <li><strong>Deliberate User Choice:</strong> Visitors are immediately presented with two prominent doors ("Instructor Track" vs. "Attendee Walkthrough"), allowing them to choose their destination consciously.</li>
+        <li><strong>Parallel Quick Directory:</strong> Directly below the cards, a comparative matrix maps out every pillar (Build, Scale, Govern, Optimise) and insight hub, offering 1-click entry into either track.</li>
+        <li><strong>Zero JavaScript Dependency:</strong> The gateway is implemented in pure static HTML and semantic CSS variables, ensuring instant load times and complete accessibility.</li>
+      </ul>
+    </section>
+
+    <!-- Section 4: Universal 1-Click Companion Bridge -->
+    <section style="margin-bottom: 40px;">
+      <h2>4. The Universal 1-Click Companion Bridge</h2>
+      <p>
+        While the two reading tracks are segregated for focus, they are never isolated. Every single document carries a context-aware 1-click bridge to its exact counterpart:
+      </p>
+      <div class="tbl-wrap" style="margin: 20px 0;">
+        <table>
+          <thead>
+            <tr>
+              <th>Current Page</th>
+              <th>Visitor Location</th>
+              <th>Companion Action</th>
+              <th>Companion Destination</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>docs/lab-1.html</code></td>
+              <td>Duncan's Lab 1 Walkthrough</td>
+              <td>Navbar Pill: <code>[ 📖 Instructor Lab 1 Guide ↗ ]</code></td>
+              <td><code>docs/instructor/lab-1-build.html</code></td>
+            </tr>
+            <tr>
+              <td><code>docs/instructor/lab-1-build.html</code></td>
+              <td>Instructor Lab 1 Guide</td>
+              <td>Top Ribbon: <code>[ 🛠️ View Duncan's Walkthrough → ]</code></td>
+              <td><code>docs/lab-1.html</code></td>
+            </tr>
+            <tr>
+              <td><code>docs/lab-2.html</code></td>
+              <td>Duncan's Lab 2 Walkthrough</td>
+              <td>Navbar Pill: <code>[ 📖 Instructor Lab 2 Guide ↗ ]</code></td>
+              <td><code>docs/instructor/lab-2-scale.html</code></td>
+            </tr>
+            <tr>
+              <td><code>docs/instructor/lab-2-scale.html</code></td>
+              <td>Instructor Lab 2 Guide</td>
+              <td>Top Ribbon: <code>[ 🛠️ View Duncan's Walkthrough → ]</code></td>
+              <td><code>docs/lab-2.html</code></td>
+            </tr>
+            <tr>
+              <td><code>docs/lab-3.html</code></td>
+              <td>Duncan's Lab 3 Walkthrough</td>
+              <td>Navbar Pill: <code>[ 📖 Instructor Lab 3 Guide ↗ ]</code></td>
+              <td><code>docs/instructor/lab-3-govern.html</code></td>
+            </tr>
+            <tr>
+              <td><code>docs/instructor/lab-3-govern.html</code></td>
+              <td>Instructor Lab 3 Guide</td>
+              <td>Top Ribbon: <code>[ 🛠️ View Duncan's Walkthrough → ]</code></td>
+              <td><code>docs/lab-3.html</code></td>
+            </tr>
+            <tr>
+              <td><code>docs/learnings.html</code></td>
+              <td>27 Attendee Post-Mortems</td>
+              <td>Navbar Pill: <code>[ 📖 Instructor Notes ↗ ]</code></td>
+              <td><code>docs/instructor/doc-viewer.html?src=LEARNINGS.md</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        This bi-directional linking guarantees that whichever path the visitor took initially, they can cross over to verify implementation details or consult original instructions in a single click.
+      </p>
+    </section>
+
+    <!-- Section 5: Static Engineering & POLA -->
+    <section style="margin-bottom: 40px;">
+      <h2>5. Static Site Engineering &amp; Principle of Least Astonishment</h2>
+      <p>
+        The static publishing architecture satisfies core engineering principles:
+      </p>
+      <ul>
+        <li><strong>GitHub Pages Parity:</strong> Published directly from the <code>/docs</code> directory with <code>.nojekyll</code> to disable Jekyll processing, guaranteeing that raw SVG diagrams, styles, and relative assets load identically locally and in production.</li>
+        <li><strong>Local Server Parity:</strong> Running <code>cd docs &amp;&amp; python -m http.server 8080</code> mirrors production exactly: <code>localhost:8080/</code> serves the Split-Gateway Portal and <code>localhost:8080/instructor/</code> serves the instructor curriculum.</li>
+        <li><strong>Theme Persistence:</strong> Both tracks share a unified dark/light theme engine adhering to OS preferences with zero flash-of-unstyled-theme (FOUST).</li>
+      </ul>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <div>Maintained in <code>ai-devcamp-labs/docs/site-design.html</code></div>
+      <div>Social Spark DevCamp Documentation Architecture</div>
+    </footer>
+
+  </main>
+
+  <script>
+    (function () {
+      var KEY = "social-spark-theme";
+      var root = document.documentElement;
+      var btn = document.getElementById("themeToggle");
+      function showing() {
+        return root.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      }
+      function paint() {
+        var s = showing();
+        btn.textContent = s === "dark" ? "☀️" : "🌙";
+        btn.title = s === "dark" ? "Switch to light" : "Switch to dark";
+      }
+      btn.addEventListener("click", function () {
+        var next = showing() === "dark" ? "light" : "dark";
+        root.dataset.theme = next;
+        try { localStorage.setItem(KEY, next); } catch (e) {}
+        paint();
+      });
+      matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+        if (!root.dataset.theme) paint();
+      });
+      paint();
+    })();
+  </script>
+</body>
+</html>
