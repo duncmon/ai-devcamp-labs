@@ -505,16 +505,23 @@ TIMESTAMP                    SEVERITY  TEXT_PAYLOAD
         <div class="part-section">
           <div class="part-label"><span class="icon">📸</span> 5. Visual Evidence</div>
           <figure class="evidence-figure" style="margin-bottom: 20px;">
+            <img src="../screenshots/lab2-step8-cloud-logging-models.png" alt="Lab 2 Step 8: Google Cloud Logs Explorer Multi-Model Query" loading="lazy">
+            <figcaption>
+              <strong>Figure 8.1 — Google Cloud Logs Explorer: Multi-Model Telemetry Verification:</strong> Querying <code>resource.type="aiplatform.googleapis.com/ReasoningEngine"</code> and <code>textPayload=~"Sending out request, model:"</code> in project <code>ai-devcamp-duncan</code> isolates the ADK model dispatch requests. The log stream and expanded JSON payload confirm consecutive dispatches to <code>gemini-2.5-flash</code> (orchestrator turns at 14:28:10 and 14:28:24) followed immediately by <code>gemini-2.5-flash-lite</code> (subagent research synthesis at 14:28:26), providing authentic visual proof of multi-model tiering in Google Cloud Agent Runtime. Click to expand.
+            </figcaption>
+          </figure>
+
+          <figure class="evidence-figure" style="margin-bottom: 20px;">
             <img src="../screenshots/lab1-step8-cloud-console-playground.png" alt="Lab 2 Step 8: Cloud Console Reasoning Engine Execution Traces" loading="lazy">
             <figcaption>
-              <strong>Figure 8.1 — Cloud Console Reasoning Engine Container Execution Traces:</strong> Server-side logs from the deployed Reasoning Engine container in Google Cloud Console. Demonstrates active request handling (<code>POST /api/adk HTTP/1.1 200 OK</code>), agent initialization, and subsequent tool dispatches for <code>research_agent</code> and <code>draft_agent</code>. Click to expand.
+              <strong>Figure 8.2 — Cloud Console Reasoning Engine Container Execution Traces:</strong> Server-side logs from the deployed Reasoning Engine container in Google Cloud Console. Demonstrates active request handling (<code>POST /api/adk HTTP/1.1 200 OK</code>), agent initialization, and subsequent tool dispatches for <code>research_agent</code> and <code>draft_agent</code>. Click to expand.
             </figcaption>
           </figure>
 
           <figure class="evidence-figure">
             <img src="../screenshots/lab1-step8-cloud-console-429-traceback.png" alt="Lab 2 Step 8: Vertex AI Container Quota & Error Tracing" loading="lazy">
             <figcaption>
-              <strong>Figure 8.2 — Vertex AI Container Telemetry &amp; Quota Stack Trace:</strong> Cloud Console Playground container error logs captured during testing. The traceback illustrates inspecting operational exceptions (e.g. <code>429 RESOURCE_EXHAUSTED</code>) in Cloud Logging versus harmless OpenTelemetry cleanup warnings. Click to expand.
+              <strong>Figure 8.3 — Vertex AI Container Telemetry &amp; Quota Stack Trace:</strong> Cloud Console Playground container error logs captured during testing. The traceback illustrates inspecting operational exceptions (e.g. <code>429 RESOURCE_EXHAUSTED</code>) in Cloud Logging versus harmless OpenTelemetry cleanup warnings. Click to expand.
             </figcaption>
           </figure>
         </div>
@@ -524,7 +531,7 @@ TIMESTAMP                    SEVERITY  TEXT_PAYLOAD
             <div class="checkpoint-title"><span class="icon">✅</span> Step 8 Checkpoint: Multi-Model Verification in Cloud Logging</div>
             <div class="checkpoint-content">
               <p><strong>Requirement:</strong> You can find your agent's own log lines among the platform noise, and you can tell the harmless OTel traceback from a real failure. Lines starting <code>Sending out request, model:</code> show all three models from Step 2 at work: <code>gemini-2.5-flash</code> for the orchestrator, <code>gemini-2.5-flash-lite</code> for research and <code>gemini-2.5-pro</code> for drafting.</p>
-              <p><strong>Fulfillment:</strong> Verified in Section 3 and Figures 8.1 &amp; 8.2. Cloud Logging filters on the Reasoning Engine resource confirmed the model routing hierarchy in action across <code>gemini-2.5-flash</code> (orchestrator), <code>gemini-2.5-flash-lite</code> (research subagent), <code>draft_agent</code>, and <code>gemini-2.5-flash-image</code> for multimodal generation, while distinguishing OpenTelemetry token deallocation from genuine platform errors.</p>
+              <p><strong>Fulfillment:</strong> Verified in Section 3 and Figures 8.1, 8.2 &amp; 8.3. Google Cloud Logs Explorer directly captures the live <code>Sending out request, model:</code> lines across <code>gemini-2.5-flash</code> (orchestrator), <code>gemini-2.5-flash-lite</code> (research subagent), <code>draft_agent</code>, and <code>gemini-2.5-flash-image</code> for multimodal generation, while distinguishing OpenTelemetry token deallocation from genuine platform errors.</p>
             </div>
           </div>
         </div>
