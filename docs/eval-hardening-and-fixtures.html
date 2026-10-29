@@ -293,5 +293,22 @@ real    2m51.85s</code></pre>
   </footer>
 
   <script src="toc.js"></script>
+  <script>
+    (function () {
+      var KEY = "social-spark-theme";
+      var root = document.documentElement;
+      var btn = document.getElementById("themeToggle");
+      function showing() {
+        return root.dataset.theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      }
+      if (btn) {
+        btn.addEventListener("click", function () {
+          var next = showing() === "dark" ? "light" : "dark";
+          root.dataset.theme = next;
+          try { localStorage.setItem(KEY, next); } catch (e) {}
+        });
+      }
+    })();
+  </script>
 </body>
 </html>

@@ -758,7 +758,7 @@ All cases passed.</code></pre>
 
         <h3>4. Empirical Simulation Scorecard</h3>
         <p>
-          Deep inspection of the execution results log (<code>social_poster_simulated_*.evalset_result.json</code>) reveals the individual scores awarded by the LLM-as-judge (<code>gemini-2.5-flash</code> with 3 judge samples per turn, score threshold $\ge 0.7$):
+          Deep inspection of the execution results log (<code>social_poster_simulated_*.evalset_result.json</code>) reveals the individual scores awarded by the LLM-as-judge (<code>gemini-2.5-flash</code> with 3 judge samples per turn, score threshold &ge; 0.7):
         </p>
         <div class="tbl-wrap">
           <table>
@@ -1127,15 +1127,17 @@ All cases passed.</code></pre>
           <p><strong>The Mechanics of Multi-Agent A2A Flakiness:</strong></p>
           <ol style="margin: 8px 0 0; padding-left: 18px;">
             <li>
-              <strong>Sample Size Bias ($N=1$ vs. $N=8$):</strong> In Step 1, <code>consults_memory</code> was only run once. A sample size of one cannot detect a 20% failure probability.
+              <strong>Sample Size Bias (<em>N</em> = 1 vs. <em>N</em> = 8):</strong> In Step 1, <code>consults_memory</code> was only run once. A sample size of one cannot detect a 20% failure probability.
             </li>
             <li>
               <strong>Rapid Socket Cycling:</strong> In our automated loop, <code>evals/run.sh</code> rapidly spawned, probed, and killed <code>mock_memory_agent.py</code> on <code>localhost:8001</code> across 8 sequential runs, occasionally catching uvicorn during socket recycling.
             </li>
             <li>
               <strong>Compounding Multi-Agent Probabilities:</strong> <code>mock_memory_agent.py</code> is itself an LLM agent calling Gemini 2.5 Flash over A2A. The end-to-end success probability is the product of five stochastic steps:
-              $$\prod_{i=1}^{5} P_i = P(\text{Route}) \times P(\text{A2A Net}) \times P(\text{Mock LLM}) \times P(\text{Agent Summary}) \times P(\text{Judge})$$
-              Even with 95% reliability per hop, $0.95^5 \approx 77\%$, guaranteeing that ~1 in 4 runs will encounter variance.
+              <div style="margin: 8px 0; padding: 10px 14px; background: rgba(0,0,0,0.15); border-radius: 6px; font-family: var(--font-mono); font-size: 0.9em; overflow-x: auto;">
+                <code>P(Success) = P(Route) &times; P(A2A Net) &times; P(Mock LLM) &times; P(Agent Summary) &times; P(Judge)</code>
+              </div>
+              Even with 95% reliability per hop, <code>0.95<sup>5</sup> &asymp; 77.4%</code>, guaranteeing that ~1 in 4 runs will encounter variance.
             </li>
           </ol>
         </div>
@@ -1151,8 +1153,6 @@ All cases passed.</code></pre>
         </ul>
       </div>
     </article>
-      </div>
-    </article>
   </main>
 
   <!-- Footer -->
@@ -1163,5 +1163,22 @@ All cases passed.</code></pre>
 
   <script src="lightbox.js"></script>
   <script src="toc.js"></script>
+  <script>
+    (function () {
+      var KEY = "social-spark-theme";
+      var root = document.documentElement;
+      var btn = document.getElementById("themeToggle");
+      function showing() {
+        return root.dataset.theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      }
+      if (btn) {
+        btn.addEventListener("click", function () {
+          var next = showing() === "dark" ? "light" : "dark";
+          root.dataset.theme = next;
+          try { localStorage.setItem(KEY, next); } catch (e) {}
+        });
+      }
+    })();
+  </script>
 </body>
 </html>
