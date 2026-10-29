@@ -1153,6 +1153,256 @@ All cases passed.</code></pre>
         </ul>
       </div>
     </article>
+
+    <!-- SECTION 5: BIGQUERY AGENT ANALYTICS & TRACES -->
+    <article class="step-card" id="step-5">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Step 5</span>
+          <h2 class="step-title">BigQuery Agent Analytics, Cost Forensics &amp; The Slowest Span</h2>
+        </div>
+        <span class="badge green">100% Verified</span>
+      </div>
+      <div class="step-body">
+        <p>
+          While evaluation suites (Steps 1–4) verify whether an agent behaves correctly according to semantic invariants, <strong>telemetry</strong> reveals what the system costs and where latency accumulates during real conversational turns. Step 5 integrates production-grade operational telemetry by connecting Google ADK to <strong>BigQuery Agent Analytics</strong> and correlating distributed spans with <strong>Cloud Trace</strong>.
+        </p>
+
+        <div class="callout info">
+          <p><strong>The Three Views of an Agent Turn:</strong></p>
+          <ul style="margin: 8px 0 0; padding-left: 18px;">
+            <li><strong>Distributed Traces (Cloud Trace):</strong> A visual execution waterfall capturing nested agent invocations, model calls, and tool spans. Answers: <em>"Why was this specific turn slow, and which tool blocked execution?"</em></li>
+            <li><strong>Execution Logs (Cloud Logging):</strong> Detailed textual telemetry capturing what prompts and tool outputs occurred. Kept sanitized (or redacted via PII middleware) to respect data governance policies.</li>
+            <li><strong>Analytics Events Table (BigQuery):</strong> A queryable SQL dataset streaming one row per lifecycle event (token counts, latencies, model versions, errors). Answers: <em>"Which agent dominates our monthly spend, and what is our thinking token ratio?"</em></li>
+          </ul>
+        </div>
+
+        <h3>1. Architectural Departures &amp; The Plugin Trap</h3>
+        <p>
+          Wiring BigQuery analytics exposed critical architectural nuances within Google ADK's plugin architecture:
+        </p>
+        <ul>
+          <li>
+            <strong>The App vs. Agent Invariant (<code>ADKAgent.from_app</code>):</strong> ADK plugins bind to an <code>App</code> instance, <em>not</em> directly to an <code>Agent</code>. The legacy component constructor <code>ADKAgent(adk_agent=root_agent)</code> silently drops plugins with zero log output or errors. In <a href="backend/main.py"><code>backend/main.py</code></a>, we re-architected initialization to invoke <code>ADKAgent.from_app(adk_app, ...)</code> and updated the native <code>Runner(app=adk_app)</code> to guarantee event forwarding.
+          </li>
+          <li>
+            <strong>Multi-Agent Telemetry Grouping by <code>agent</code>:</strong> When sub-agents (such as <code>draft_agent</code> and <code>research_agent</code>) execute via <code>AgentTool</code>, ADK spawns them in distinct isolated sessions with their own invocation and trace IDs. Consequently, grouping SQL queries by <code>session_id</code> silently omits sub-agent operations. All financial and operational SQL queries must group by the <code>agent</code> column.
+          </li>
+          <li>
+            <strong>Dynamic Views over JSON Payloads:</strong> <code>BigQueryAgentAnalyticsPlugin</code> streams structured rows into <code>agent_events</code> and dynamically manages flattened, typed analytical views (<code>v_llm_response</code>, <code>v_tool_completed</code>, <code>v_llm_error</code>), eliminating complex <code>JSON_VALUE</code> extractions in downstream analytics.
+          </li>
+        </ul>
+
+        <h3>2. Authentic Terminal Verification &amp; Table Population</h3>
+        <p>
+          We created the parent dataset <code>agent_analytics</code> in the <code>US</code> region (<code>bq mk --location=US --dataset agent_analytics</code>), configured <code>BQ_ANALYTICS_DATASET=agent_analytics</code> in <a href="backend/social_poster/.env"><code>backend/social_poster/.env</code></a>, and executed a live turn via <code>evals/smoke_turn.py</code> with the prompt: <em>"Draft a short LinkedIn post about code review. No research, no image."</em>
+        </p>
+        <p>
+          Inspecting <code>agent_events</code> confirmed that the plugin automatically initialized the schema, created the typed views, and streamed <strong>43 event records</strong> across 11 lifecycle categories:
+        </p>
+
+        <figure class="step-figure">
+          <img src="screenshots/lab4-step5-bigquery-analytics-terminal.png" alt="Figure 5.1: BigQuery agent_events table counts and evals/analytics.py analytical query execution" class="lightbox-trigger">
+          <figcaption><strong>Figure 5.1:</strong> Authentic terminal capture showing <code>bq query</code> event count distribution (43 events) and the complete execution of analytical queries Q1 through Q6 via <code>evals/analytics.py</code>.</figcaption>
+        </figure>
+
+        <h3>3. Checkpoint Analytics Breakdown (Q1–Q6)</h3>
+        <p>
+          Executing <a href="evals/analytics.py"><code>evals/analytics.py</code></a> against BigQuery evaluated the complete turn telemetry across our analytical queries:
+        </p>
+
+        <h4>Q1 &amp; Q2: Token Allocation &amp; Agent Cost Ranking</h4>
+        <div style="overflow-x: auto; margin-bottom: 16px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th>Model</th>
+                <th>LLM Calls</th>
+                <th>Prompt Tokens</th>
+                <th>Completion Tokens</th>
+                <th>Thinking Tokens</th>
+                <th>Avg Prompt/Call</th>
+                <th>Est. Cost (USD)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong><code>draft_agent</code></strong></td>
+                <td><code>gemini-2.5-flash</code></td>
+                <td>5</td>
+                <td>12,421</td>
+                <td>151</td>
+                <td>444</td>
+                <td>2,484.0</td>
+                <td><strong>$0.00521</strong> (70.5%)</td>
+              </tr>
+              <tr>
+                <td><strong><code>social_poster</code></strong></td>
+                <td><code>gemini-2.5-flash</code></td>
+                <td>2</td>
+                <td>5,247</td>
+                <td>147</td>
+                <td>95</td>
+                <td>2,624.0</td>
+                <td><strong>$0.00218</strong> (29.5%)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout check">
+          <p><strong>Checkpoint Question 1 Answer — Which agent costs the most?</strong></p>
+          <p>
+            <strong><code>draft_agent</code> is the dominant cost driver, accounting for $0.00521 (70.5% of total conversational spend).</strong> This 2.39&times; cost disparity is driven by <code>draft_agent</code> executing 5 separate model calls during progressive disclosure (listing skills, loading <code>brand-voice</code>, loading <code>post-formatter</code>, loading <code>platform-style</code>, and synthesizing the final copy), re-transmitting its entire conversational prompt context (~2,484 tokens) on each intermediate hop.
+          </p>
+        </div>
+
+        <h4>Q3: Latency Distribution &amp; The Slowest Span</h4>
+        <div style="overflow-x: auto; margin-bottom: 16px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th>Runs</th>
+                <th>p50 Latency (ms)</th>
+                <th>Max Latency (ms)</th>
+                <th>Relative Share of Turn</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong><code>social_poster</code></strong> (Root Orchestrator)</td>
+                <td>1</td>
+                <td>14,690 ms</td>
+                <td>14,690 ms (14.69s)</td>
+                <td>100.0% (Parent Envelope)</td>
+              </tr>
+              <tr>
+                <td><strong><code>draft_agent</code></strong> (Specialist Sub-Agent)</td>
+                <td>1</td>
+                <td>7,756 ms</td>
+                <td>7,756 ms (7.76s)</td>
+                <td><strong>52.8%</strong> (Dominant Child Span)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout check">
+          <p><strong>Checkpoint Question 2 Answer — Which agent run took longest?</strong></p>
+          <p>
+            <strong>The root orchestrator (<code>social_poster</code>) recorded the longest total execution envelope at 14,690 ms (14.69s), while <code>draft_agent</code> was the slowest individual sub-agent run at 7,756 ms (7.76s).</strong> Because plain tool calls report 0 ms, the bulk of turn latency is concentrated in <code>draft_agent</code>'s sequential multi-hop model invocations, representing 52.8% of the entire turn duration.
+          </p>
+        </div>
+
+        <h4>Q4 &amp; Q5: Errors &amp; Approval Funnel Metrics</h4>
+        <ul>
+          <li><strong>Q4 (Model Errors &amp; Guardrail Interceptions):</strong> <code>(no rows)</code>. Model Armor and API endpoints completed with zero errors or blocks.</li>
+          <li><strong>Q5 (Approval-to-Post Conversion):</strong> 1 session initiated a draft; 0 reached <code>create_post</code>. This aligns precisely with the test specification: the smoke turn evaluated initial drafting without human posting approval.</li>
+        </ul>
+
+        <h4>Q6: Custom Deep-Dive — Thinking Token Share &amp; Cache Hit Ratio</h4>
+        <p>
+          To uncover deeper architectural levers, we authored custom query <strong><code>Q6</code></strong> targeting the relationship between reasoning tokens, context caching, and visible completion output:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>evals/analytics_queries.sql (Q6 Custom Query)</span></div>
+          <pre><code>SELECT
+  agent,
+  COUNT(*)                                                                             AS llm_calls,
+  ROUND(AVG(usage_prompt_tokens))                                                      AS avg_prompt_tokens,
+  ROUND(AVG(usage_completion_tokens))                                                  AS avg_completion_tokens,
+  ROUND(SAFE_DIVIDE(SUM(usage_thinking_tokens), SUM(usage_completion_tokens)) * 100, 1) AS thinking_pct_of_output,
+  ROUND(AVG(IFNULL(context_cache_hit_rate, 0)) * 100, 1)                               AS avg_cache_hit_pct,
+  ROUND(AVG(total_ms))                                                                 AS avg_latency_ms
+FROM `PROJECT.DATASET.v_llm_response`
+GROUP BY agent
+ORDER BY avg_prompt_tokens DESC;</code></pre>
+        </div>
+
+        <div style="overflow-x: auto; margin-bottom: 16px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th>LLM Calls</th>
+                <th>Avg Prompt Tokens</th>
+                <th>Avg Completion Tokens</th>
+                <th>Thinking % of Output</th>
+                <th>Avg Cache Hit %</th>
+                <th>Avg Latency per Call</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong><code>social_poster</code></strong></td>
+                <td>2</td>
+                <td>2,624.0</td>
+                <td>74.0</td>
+                <td>64.6%</td>
+                <td>0.0%</td>
+                <td>2,191 ms</td>
+              </tr>
+              <tr>
+                <td><strong><code>draft_agent</code></strong></td>
+                <td>5</td>
+                <td>2,484.0</td>
+                <td>30.0</td>
+                <td><strong>294.0%</strong></td>
+                <td><strong>42.5%</strong></td>
+                <td>1,539 ms</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout tip">
+          <p><strong>Key Empirical Insights from Q6:</strong></p>
+          <ul style="margin: 8px 0 0; padding-left: 18px;">
+            <li>
+              <strong>Thinking Tokens Heavily Outweigh Visible Output:</strong> In <code>draft_agent</code>, thinking tokens (444) represented <strong>294.0% of visible completion text (151 tokens)</strong>. Nearly 3&times; more tokens were spent reasoning than writing. Because thinking tokens are billed as output at $2.50 per 1M tokens (the highest rate on Gemini), constraining thinking budgets on structured formatting agents is the single highest-leverage cost lever.
+            </li>
+            <li>
+              <strong>Context Caching Cushions Multi-Hop Penalties:</strong> Despite <code>draft_agent</code> re-sending ~2,484 prompt tokens across 5 calls, Vertex AI's automatic context caching achieved a <strong>42.5% cache hit rate</strong> across the sub-agent's session, mitigating repetitive prompt token billing by nearly half.
+            </li>
+          </ul>
+        </div>
+
+        <h3>4. State vs. Prompt: The Architectural Token Lever</h3>
+        <p>
+          Our telemetry demonstrates the fundamental cost distinction between <strong>Prompt Instructions</strong> and <strong>Session State</strong>:
+        </p>
+        <ul>
+          <li>
+            <strong>Prompt Instructions:</strong> Static rules placed in an agent's instruction are billed on every single model call across every turn. The orchestrator's lengthy governance rules are carried across all orchestrator turns.
+          </li>
+          <li>
+            <strong>Session State (<code>output_key</code>):</strong> Dynamic payloads written to state (e.g. <code>research_notes</code> via <code>output_key="research_notes"</code>) travel only to the specific specialist agents that require them (via <code>{research_notes}</code> template injection), keeping intermediate tokens off unrelated orchestrator and gating calls.
+          </li>
+        </ul>
+
+        <h3>5. Distributed Tracing on Deployed Agents</h3>
+        <p>
+          When deploying to Vertex AI Reasoning Engine or Cloud Run, distributed tracing is activated via container environment variables without modifying source code:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>Deployment Telemetry Environment Flags</span></div>
+          <pre><code>GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY=true
+OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental
+OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=NO_CONTENT</code></pre>
+        </div>
+        <p>
+          Setting <code>OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=NO_CONTENT</code> preserves data privacy and PII compliance by capturing token usage, latencies, and tool schemas while omitting raw user prompt and model reply text from trace spans.
+        </p>
+        <div class="callout warning">
+          <p><strong>Harmless Telemetry Log Warning:</strong></p>
+          <p>
+            When OpenTelemetry tracing is active, Cloud Logging will frequently display an <code>ERROR</code> log stating <code>Failed to detach context</code>. This is a known interaction between Google ADK and OpenTelemetry caused by an asynchronous span closing in a different asyncio event task than the one that opened it during runner cleanup. It occurs after the turn successfully completes and has zero impact on application behavior.
+          </p>
+        </div>
+      </div>
+    </article>
   </main>
 
   <!-- Footer -->
