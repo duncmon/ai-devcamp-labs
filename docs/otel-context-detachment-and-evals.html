@@ -260,6 +260,44 @@ We verified the local path end to end... If you demo it, run it the day before.<
         <p>
           However, <strong><code>roles/bigquery.dataEditor</code> was never granted to the Agent Identity principal on the <code>agent_analytics</code> dataset</strong>. When the deployed engine's <code>BigQueryAgentAnalyticsPlugin</code> attempted to stream rows via the Storage Write API, the call was denied by IAM. Because the plugin swallows write errors to prevent disrupting user-facing chat traffic, the failure was silent.
         </p>
+
+        <h3>The Resolution &amp; 91-Row Empirical Proof</h3>
+        <p>
+          Using the official Google Cloud IAM skill pattern, we granted <code>roles/bigquery.dataEditor</code> and <code>roles/bigquery.jobUser</code> to the project-wide Agent Identity principalSet:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>Terminal (IAM Binding)</span></div>
+          <pre><code>PROJECT_NUMBER=$(gcloud projects describe "$GOOGLE_CLOUD_PROJECT" --format='value(projectNumber)')
+PRINCIPAL_SET="principalSet://agents.global.proj-$PROJECT_NUMBER.system.id.goog/attribute.platformContainer/aiplatform/projects/$PROJECT_NUMBER"
+
+gcloud projects add-iam-policy-binding "$GOOGLE_CLOUD_PROJECT" \
+  --member="$PRINCIPAL_SET" \
+  --role="roles/bigquery.dataEditor" \
+  --condition=None
+
+gcloud projects add-iam-policy-binding "$GOOGLE_CLOUD_PROJECT" \
+  --member="$PRINCIPAL_SET" \
+  --role="roles/bigquery.jobUser" \
+  --condition=None</code></pre>
+        </div>
+
+        <p>
+          We immediately triggered a fresh turn against the deployed engine via <code>curl streamQuery</code> and re-queried the BigQuery table. The event count jumped from <strong>43 to exactly 91 rows (+48 events)</strong>, streaming directly from the container:
+        </p>
+
+        <figure class="step-figure">
+          <img src="screenshots/lab4-step5-bq-count-91-proof.png" alt="Figure A.3: BigQuery table count jumping to 91 rows after IAM role grant" class="lightbox-trigger">
+          <figcaption><strong>Figure A.3:</strong> <code>bq query</code> verification demonstrating that immediately following the IAM grant, <code>agent_events</code> expanded to <strong>91 rows (+48 events)</strong> directly written by the deployed Reasoning Engine.</figcaption>
+        </figure>
+
+        <p>
+          Re-running <a href="evals/analytics.py"><code>evals/analytics.py</code></a> confirmed that Q1–Q6 now aggregates both local and cloud turns seamlessly:
+        </p>
+
+        <figure class="step-figure">
+          <img src="screenshots/lab4-step5-analytics-post-iam-proof.png" alt="Figure A.4: Updated analytics.py output reflecting 91 rows across local and deployed turns" class="lightbox-trigger">
+          <figcaption><strong>Figure A.4:</strong> Updated <code>evals/analytics.py</code> execution showing 2 completed sessions, 15 total LLM calls (10 on <code>draft_agent</code>, 5 on <code>social_poster</code>), max turn latency of 21.68s, and an average context cache hit rate of 50.7%.</figcaption>
+        </figure>
       </div>
     </article>
 

@@ -1307,7 +1307,13 @@ if key and key.lower() not in ("none", "unset", "use_secret", "secret_manager", 
           <strong>The Root Cause:</strong> In Lab 2, <code>gcp-setup.sh</code> provisioned the agent's cryptographic identity (<code>principal://agents.global...</code>) with logging, tracing, and storage roles, but <strong>omitted <code>roles/bigquery.dataEditor</code></strong> on the BigQuery dataset. When the deployed container's <code>BigQueryAgentAnalyticsPlugin</code> attempted to stream rows via the Storage Write API, Google Cloud denied the write. Because the plugin intentionally swallows write errors to prevent breaking the chat stream, the failure was completely silent.
         </p>
         <p>
-          <strong>The Resolution:</strong> Documented the required IAM grant binding <code>roles/bigquery.dataEditor</code> to the Agent Engine principalSet, unlocking full cloud-native telemetry ingestion.
+          <strong>The Resolution &amp; 91-Row Empirical Proof:</strong> Applied <code>roles/bigquery.dataEditor</code> and <code>roles/bigquery.jobUser</code> to the project-wide Agent Identity principalSet (<code>principalSet://agents.global.proj-$PROJECT_NUMBER.system.id.goog/...</code>). Immediately upon re-testing, <code>agent_events</code> jumped from <strong>43 to exactly 91 rows (+48 events)</strong> directly ingested from the cloud container, completely bridging the gap the curriculum left untested.
+        </p>
+        <p style="margin-top: 14px;">
+          <a href="otel-context-detachment-and-evals.html#deployed-bq-audit" class="subpage-card-link" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--accent);">
+            <span>📖 Read the IAM proof and audit in Annexe: OpenTelemetry Context Detachment &amp; Online Evals</span> &rarr;
+          </a>
+        </p>
         </p>
       </div>
     </article>

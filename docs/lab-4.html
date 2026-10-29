@@ -1432,6 +1432,14 @@ BQ_ANALYTICS_LOCATION=US</code></pre>
           </p>
         </div>
 
+        <h4>Bridging the Deployed BigQuery Ingestion Gap (91 Rows Verified)</h4>
+        <p>
+          In the instructor's private demo notes (<code>docs/instructor/lab-4-demo-script.md</code>), instructors were told to avoid claiming BigQuery rows from a deployed agent because the cloud path had not been validated. Our initial audit confirmed why: the table stalled at 43 rows because the Agent Identity principal lacked BigQuery permissions.
+        </p>
+        <p>
+          Applying <code>roles/bigquery.dataEditor</code> and <code>roles/bigquery.jobUser</code> to the project-wide Agent Identity principalSet instantly resolved the write block. A subsequent turn streamed <strong>48 new rows</strong> directly into BigQuery (expanding the table to <strong>91 rows</strong>). Re-running <code>evals/analytics.py</code> aggregated both local and deployed turns across 15 LLM calls with a combined context cache hit rate of 50.7%.
+        </p>
+
         <h3>6. Answering the Instructor's Open Question: Mis-Parented Spans &amp; Online Evaluation</h3>
         <div class="callout warning">
           <p><strong>The Instructor's Open Question:</strong></p>
