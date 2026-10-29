@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Annexe: OpenTelemetry Context Detachment &amp; Online Evaluation — Duncan's Portfolio</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    try {
+      var t = localStorage.getItem("social-spark-theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-left">
+      <div class="brand-mark"></div>
+      <a href="index.html" class="nav-title">Social Spark — Attendee Portfolio</a>
+      <span class="nav-subtitle">Annexe: OTel Detachment &amp; Online Evals</span>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html">Overview</a>
+      <a href="lab-1.html">Lab 1</a>
+      <a href="lab-2.html">Lab 2</a>
+      <a href="lab-3.html">Lab 3</a>
+      <a href="lab-4.html">Lab 4</a>
+      <a href="learnings.html">Our Learnings</a>
+      <a href="otel-context-detachment-and-evals.html" class="active">OTel &amp; Online Evals</a>
+      <a href="instructor/lab-4-optimize.html" class="companion-pill">
+        📖 Instructor Lab 4 Guide ↗
+      </a>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">🌗</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-meta">
+        <span class="badge blue">Architectural Annexe</span>
+        <span class="badge red">Lab 4 · Optimise</span>
+        <span>Environment: <strong>Local &amp; Vertex AI us-central1</strong></span>
+      </div>
+      <h1>OpenTelemetry Context Detachment, Franken-Traces &amp; The Online Evaluation Blind Spot</h1>
+      <p class="lead">
+        An empirical autopsy of Python <code>contextvars</code> scoping failures in asynchronous streaming architectures, the generation of conjoined multi-session <strong>"Franken-Traces"</strong>, and their destructive impact on automated production evaluators such as <strong>Vertex AI Online Evaluation</strong>.
+      </p>
+      <div class="callout info">
+        <strong>The Instructor's Unanswered Question:</strong> In Step 5 of the official curriculum, the instructor noted: <em>"Failed to detach context appears at ERROR for each request once telemetry is on... Open question we did not answer: whether those mis-parented spans affect anything that reads traces by conversation, such as Online Evaluation."</em> This annexe provides the definitive empirical answer, reproducing the exact failure mode in isolation and evaluating its architectural hazards.
+      </div>
+    </section>
+
+    <!-- SECTION 1: THE ROOT CAUSE -->
+    <article class="step-card" id="root-mechanism">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Part 1</span>
+          <h2 class="step-title">The Root Mechanism: Asynchronous Contextvars Scoping</h2>
+        </div>
+        <span class="badge red">SDK Diagnostic</span>
+      </div>
+      <div class="step-body">
+        <p>
+          To understand why <code>Failed to detach context</code> appears in Cloud Logging, we audited the interaction between <strong>Google ADK's streaming runner</strong> and <strong>OpenTelemetry's Python SDK</strong>:
+        </p>
+
+        <h3>1. The Contextvars Token Contract</h3>
+        <p>
+          OpenTelemetry Python manages span activation via Python's built-in <code>contextvars</code> library. When a span begins, <code>trace.context_api.attach(context)</code> invokes <code>ContextVar.set()</code>, returning an opaque <code>Token</code>:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>opentelemetry/context/contextvars_context.py</span></div>
+          <pre><code>def attach(self, context: Context) -> object:
+    return self._current_context.set(context)
+
+def detach(self, token: object) -> None:
+    self._current_context.reset(token)  # <-- The Crash Site</code></pre>
+        </div>
+        <p>
+          Python's <code>contextvars</code> specification imposes a strict invariant: <strong>a token can only be reset within the exact same context (and asyncio Task) where it was created</strong>. If <code>reset(token)</code> is called in a different Task context, the Python interpreter raises:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>Interpreter Error</span></div>
+          <pre><code>ValueError: &lt;Token var=&lt;ContextVar name='current_context' ...&gt;&gt; was created in a different Context</code></pre>
+        </div>
+
+        <h3>2. Why Async Streaming Violates Scoping</h3>
+        <p>
+          In Google ADK and FastAPI/ASGI streaming architectures:
+        </p>
+        <ol>
+          <li><strong>Span Activation:</strong> The HTTP handler starts an asynchronous generator (e.g. <code>run_async()</code>), entering an OTel span inside Task <em>A</em> and attaching the token.</li>
+          <li><strong>Cross-Task Event Streaming:</strong> Tokens and state chunks are yielded across event-loop cycles as server-sent events (SSE).</li>
+          <li><strong>Background Cleanup:</strong> When the client disconnects or the generator completes, cleanup routines, garbage collection, and span finalization run in a background event-loop task (Task <em>B</em>).</li>
+          <li><strong>The Detachment Failure:</strong> Task <em>B</em> calls <code>trace.context_api.detach(token)</code>. Python rejects the cross-task token reset with <code>ValueError</code>. OTel catches the error, leaves the span context un-reset, and logs:
+            <div style="margin: 6px 0; color: #ff5252; font-family: var(--font-mono);">ERROR: opentelemetry.trace: Failed to detach context</div>
+          </li>
+        </ol>
+      </div>
+    </article>
+
+    <!-- SECTION 2: EMPIRICAL REPRODUCTION & FRANKEN-TRACES -->
+    <article class="step-card" id="empirical-proof">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Part 2</span>
+          <h2 class="step-title">Empirical Reproduction &amp; The "Franken-Trace" Discovery</h2>
+        </div>
+        <span class="badge blue">Empirical Proof</span>
+      </div>
+      <div class="step-body">
+        <p>
+          We authored an empirical demonstration script (<a href="evals/prove_otel_detachment.py"><code>evals/prove_otel_detachment.py</code></a>) to simulate two sequential conversational turns on the same worker thread:
+        </p>
+        <ul>
+          <li><strong>Turn 1:</strong> User <strong>Alice</strong> (Session <code>sess-alice-001</code>) requests: <em>"Draft a post about microservices"</em>.</li>
+          <li><strong>Turn 2:</strong> User <strong>Bob</strong> (Session <code>sess-bob-002</code>) requests: <em>"Schedule a meeting"</em>.</li>
+        </ul>
+
+        <figure class="step-figure">
+          <img src="screenshots/lab4-step5-prove-otel-detachment-terminal.png" alt="Figure A.1: Empirical proof terminal showing ValueError and conjoined Franken-Trace" class="lightbox-trigger">
+          <figcaption><strong>Figure A.1:</strong> Authentic terminal capture of <code>evals/prove_otel_detachment.py</code> demonstrating the exact <code>ValueError</code>, context leakage, and the creation of a conjoined Franken-Trace parenting Bob under Alice.</figcaption>
+        </figure>
+
+        <h3>The Forensic Evidence</h3>
+        <p>
+          The output from our test script proves the failure cascade:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>evals/prove_otel_detachment.py Terminal Output</span></div>
+          <pre><code>--- 1. Simulating Turn 1 (User: Alice, Session: sess-alice-001) ---
+Failed to detach context
+Traceback (most recent call last):
+  File ".../opentelemetry/context/__init__.py", line 143, in detach
+    _RUNTIME_CONTEXT.detach(token)
+  File ".../opentelemetry/context/contextvars_context.py", line 42, in detach
+    self._current_context.reset(token)
+ValueError: &lt;Token var=&lt;ContextVar name='current_context' ...&gt; at ...&gt; was created in a different Context
+
+Alice Span ID:  80a4c81e1a252cfa
+Alice Trace ID: 923bc163c0c3614b3d06e520ff157ea9
+
+Current active span in worker after Turn 1 cleanup: _Span(name="turn_sess-alice-001"...)
+Did Alice's span leak into worker context? -&gt; True
+
+--- 2. Simulating Turn 2 (User: Bob, Session: sess-bob-002) ---
+Bob Span ID:         60f854d7a1320ab8
+Bob Trace ID:        923bc163c0c3614b3d06e520ff157ea9  # &lt;-- IDENTICAL TO ALICE!
+Bob's Parent Span ID: 80a4c81e1a252cfa                   # &lt;-- ALICE'S SPAN!
+CRITICAL: Is Bob's turn parented under Alice's turn? -&gt; True
+
+--- 3. Trace Exporter Hierarchy Audit ---
+Span: turn_sess-alice-001  trace_id=923bc163c0c3614b3d06e520ff157ea9 span_id=80a4c81e1a252cfa ROOT
+Span: turn_sess-bob-002    trace_id=923bc163c0c3614b3d06e520ff157ea9 span_id=60f854d7a1320ab8 parent=80a4c81e1a252cfa</code></pre>
+        </div>
+
+        <div class="callout warning">
+          <p><strong>The "Franken-Trace" Disaster:</strong></p>
+          <p>
+            Because <code>reset(token)</code> failed, Alice's span was never cleared from the worker's contextvar. When Bob's turn arrived at the same worker thread, <code>tracer.start_span()</code> inspected the active context, discovered Alice's active span, and <strong>assigned Bob's turn as a child of Alice's span within Alice's trace ID</strong>.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <!-- SECTION 3: DOWNSTREAM IMPACT ON ONLINE EVALUATION -->
+    <article class="step-card" id="online-eval-impact">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Part 3</span>
+          <h2 class="step-title">Destructive Impact on Online Evaluation &amp; Session Analytics</h2>
+        </div>
+        <span class="badge red">Enterprise Risk</span>
+      </div>
+      <div class="step-body">
+        <p>
+          We can now answer the instructor's open question with empirical certainty:
+        </p>
+
+        <h3>1. Does it affect Cloud Trace &amp; BigQuery? (Safe)</h3>
+        <p>
+          <strong>No.</strong> In Cloud Trace and BigQuery Agent Analytics, individual spans are serialized with explicitly stamped header IDs (<code>trace_id</code> and <code>span_id</code>) at creation time. The visual waterfall and BigQuery event rows assemble accurately within single isolated invocations.
+        </p>
+
+        <h3>2. Does it affect Online Evaluation? (Critically Vulnerable)</h3>
+        <p>
+          <strong>YES.</strong> Automated online evaluation services (such as Vertex AI Online Evaluation, continuous LLM judges, or custom tracing evaluators) ingest production telemetry grouped by <em>conversational session tree</em>. Franken-traces introduce three catastrophic failure modes:
+        </p>
+
+        <div style="overflow-x: auto; margin-bottom: 20px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Failure Vector</th>
+                <th>Underlying Mechanism</th>
+                <th>Impact on Online Evaluation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>1. Cross-Session Context Bleed ("Franken-Traces")</strong></td>
+                <td>Leaked context causes Turn <em>N+1</em> (User Bob) to be parented under Turn <em>N</em> (User Alice).</td>
+                <td>The automated judge evaluates Bob's prompt against Alice's conversational context, scoring semantic coherence at <strong>0.0 (Hallucination / Topic Drift)</strong> when the agent was completely coherent.</td>
+              </tr>
+              <tr>
+                <td><strong>2. Sub-Agent Session Blind Spots</strong></td>
+                <td><code>AgentTool</code> launches <code>draft_agent</code> in an isolated session ID. If context propagation breaks across the sub-agent boundary, traces fragment.</td>
+                <td>Online Evaluators assessing the root conversation trace see only the orchestrator's high-level delegation, <strong>completely missing drafting hallucinations, skill skipping, or sub-agent safety violations</strong>.</td>
+              </tr>
+              <tr>
+                <td><strong>3. Evaluation Trigger Suppression</strong></td>
+                <td>Automated evaluators trigger scoring when a trace closes cleanly with <code>STATUS_OK</code>. An unhandled <code>ERROR</code> traceback aborts the pipeline.</td>
+                <td>Valid, successful conversational turns are misclassified as server failures and <strong>silently dropped from production evaluation datasets</strong>, biasing quality metrics.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </article>
+
+    <!-- SECTION 4: DEPLOYED BIGQUERY IAM AUDIT -->
+    <article class="step-card" id="deployed-bq-audit">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Part 4</span>
+          <h2 class="step-title">The Deployed BigQuery Ingestion Audit (The Missing IAM Role)</h2>
+        </div>
+        <span class="badge blue">Empirical Audit</span>
+      </div>
+      <div class="step-body">
+        <p>
+          In the instructor's private demo script (<code>docs/instructor/lab-4-demo-script.md</code>), they made a striking admission:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>lab-4-demo-script.md (Line 19)</span></div>
+          <pre><code>Do not claim... anything in the console's Traces tab, or BigQuery rows written by a deployed agent.
+We verified the local path end to end... If you demo it, run it the day before.</code></pre>
+        </div>
+        <p>
+          To uncover why the instructor could not demonstrate deployed BigQuery rows, we audited our deployed Reasoning Engine (Engine ID <code>1836136314752204800</code>). After executing our deployed turn via <code>streamQuery</code>, we queried the row count of <code>agent_events</code>:
+        </p>
+
+        <figure class="step-figure">
+          <img src="screenshots/lab4-step5-bq-count-43-audit.png" alt="Figure A.2: BigQuery table count remaining at 43 rows after deployed turn" class="lightbox-trigger">
+          <figcaption><strong>Figure A.2:</strong> <code>bq query</code> audit showing <code>agent_events</code> remained at exactly 43 rows, proving that the deployed Reasoning Engine failed to write rows to BigQuery.</figcaption>
+        </figure>
+
+        <h3>Root Cause: Missing Dataset Grants on the Agent Identity</h3>
+        <p>
+          In Lab 2, <code>gcp-setup.sh</code> provisioned the agent's dedicated cryptographic identity (<code>principal://agents.global.proj-498585195540...</code>) and granted it:
+        </p>
+        <ul>
+          <li><code>roles/logging.logWriter</code> (Cloud Logging)</li>
+          <li><code>roles/cloudtrace.agent</code> (Cloud Trace)</li>
+          <li><code>roles/storage.objectUser</code> (Cloud Storage)</li>
+        </ul>
+        <p>
+          However, <strong><code>roles/bigquery.dataEditor</code> was never granted to the Agent Identity principal on the <code>agent_analytics</code> dataset</strong>. When the deployed engine's <code>BigQueryAgentAnalyticsPlugin</code> attempted to stream rows via the Storage Write API, the call was denied by IAM. Because the plugin swallows write errors to prevent disrupting user-facing chat traffic, the failure was silent.
+        </p>
+      </div>
+    </article>
+
+    <!-- SECTION 5: PRODUCTION REMEDIATION PATTERNS -->
+    <article class="step-card" id="remediation-patterns">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Part 5</span>
+          <h2 class="step-title">Production Architectural Remediation Patterns</h2>
+        </div>
+        <span class="badge green">Production Best Practices</span>
+      </div>
+      <div class="step-body">
+        <p>
+          To safely deploy OpenTelemetry tracing and Vertex AI Online Evaluation in enterprise ADK architectures, teams must apply two architectural patterns:
+        </p>
+
+        <h3>Pattern 1: Explicit Context Resetting ASGI Middleware</h3>
+        <p>
+          Because generator cleanup tasks cannot reliably reset tokens across asyncio tasks, the outer HTTP/ASGI boundary must explicitly snapshot and restore the contextvar state before and after each request:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>backend/telemetry_middleware.py</span></div>
+          <pre><code>import contextvars
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class IsolatedTelemetryContextMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        # Create an isolated copy of current contextvars
+        ctx = contextvars.copy_context()
+        # Execute the entire request lifecycle inside the isolated copy
+        response = await ctx.run(call_next, request)
+        return response</code></pre>
+        </div>
+        <p>
+          Using <code>copy_context().run()</code> guarantees that any token leaks or context detach failures remain contained within that single HTTP request and never bleed into subsequent turns handled by the same event-loop worker.
+        </p>
+
+        <h3>Pattern 2: Grant BigQuery Data Editor to Agent Identity</h3>
+        <p>
+          To enable deployed Reasoning Engines to write to BigQuery Agent Analytics, bind <code>roles/bigquery.dataEditor</code> to the Agent Engine principalSet:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>Terminal (One-Time IAM Setup)</span></div>
+          <pre><code>gcloud projects add-iam-policy-binding $GOOGLE_CLOUD_PROJECT \
+  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/agents.global.proj-$PROJECT_NUMBER.system.id.goog/attribute.engine_id/YOUR_ENGINE_ID" \
+  --role="roles/bigquery.dataEditor"</code></pre>
+        </div>
+      </div>
+    </article>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div><a href="lab-4.html">← Back to Lab 4 (Optimise)</a> | <a href="learnings.html">View Attendee Learnings Hub →</a></div>
+    <div>Maintained in <code>ai-devcamp-labs/docs/otel-context-detachment-and-evals.html</code></div>
+  </footer>
+
+  <script src="lightbox.js"></script>
+  <script src="toc.js"></script>
+  <script>
+    (function () {
+      var KEY = "social-spark-theme";
+      var root = document.documentElement;
+      var btn = document.getElementById("themeToggle");
+      function showing() {
+        return root.dataset.theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      }
+      if (btn) {
+        btn.addEventListener("click", function () {
+          var next = showing() === "dark" ? "light" : "dark";
+          root.dataset.theme = next;
+          try { localStorage.setItem(KEY, next); } catch (e) {}
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

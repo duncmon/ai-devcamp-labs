@@ -1469,6 +1469,11 @@ BQ_ANALYTICS_LOCATION=US</code></pre>
             <strong>Premature Evaluation Window Rejection:</strong> Many automated evaluation pipelines trigger based on clean trace exit codes (<code>STATUS_CODE_OK</code>). An unhandled <code>ERROR</code> during span teardown can lead strict online evaluators to flag the trace as an unhandled server failure, causing valid production turns to be silently discarded from the evaluation dataset.
           </li>
         </ol>
+        <p style="margin-top: 16px;">
+          <a href="otel-context-detachment-and-evals.html" class="subpage-card-link" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--accent);">
+            <span>📖 Read the complete empirical autopsy and code reproduction in Annexe: OpenTelemetry Context Detachment &amp; Online Evals</span> &rarr;
+          </a>
+        </p>
       </div>
     </article>
   </main>

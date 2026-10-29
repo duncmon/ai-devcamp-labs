@@ -1257,6 +1257,61 @@ if key and key.lower() not in ("none", "unset", "use_secret", "secret_manager", 
       </div>
     </article>
 
+    <!-- ISSUE 32: PILLAR 4 - OTEL CONTEXT DETACHMENT & FRANKEN-TRACES -->
+    <article class="step-card" id="issue-otel-context-detachment">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 32 · Pillar 4 (Optimise)</span>
+          <h2 class="step-title">The OpenTelemetry Context Detachment Trap &amp; Franken-Traces in Online Evaluation</h2>
+        </div>
+      </div>
+      <div class="step-body">
+        <p>
+          <strong>The Context:</strong> In Lab 4 Step 5, enabling OpenTelemetry telemetry on the deployed Reasoning Engine produces recurring <code>ERROR</code> logs stating <code>Failed to detach context</code>. The instructor documentation raised an unanswered open question: <em>"whether those mis-parented spans affect anything that reads traces by conversation, such as Online Evaluation."</em>
+        </p>
+        <p>
+          <strong>The Empirical Discovery:</strong> Through our isolation script (<code>evals/prove_otel_detachment.py</code>), we proved that Python's <code>contextvars.ContextVar.reset(token)</code> raises <code>ValueError</code> when invoked across asynchronous tasks during streaming runner cleanup. Crucially, because the detachment fails, the active span token is <strong>never cleared from the worker context</strong>. When a subsequent user request arrives on the same worker thread, OpenTelemetry automatically adopts the leaked span as its parent and reuses the old <code>trace_id</code>, fusing distinct user conversations into a single conjoined <strong>"Franken-Trace"</strong>.
+        </p>
+        <p>
+          <strong>The Online Evaluation Impact:</strong>
+        </p>
+        <ul>
+          <li><strong>Severe Semantic Judge Corruption:</strong> Automated evaluators like Vertex AI Online Evaluation read traces by conversational session trees. Conjoined Franken-traces cause the LLM judge to evaluate User B's prompt against User A's context, scoring semantic coherence at <strong>0.0</strong> for perfectly valid responses.</li>
+          <li><strong>Sub-Agent Session Blind Spots:</strong> <code>AgentTool</code> launches <code>draft_agent</code> in an isolated sub-session. If context propagation breaks across task boundaries, online evaluators evaluate only the top-level orchestrator wrapper, remaining blind to drafting hallucinations or skill violations.</li>
+          <li><strong>Evaluation Window Dropping:</strong> Teardown errors can cause online evaluators to classify the trace as an unhandled server error (<code>STATUS_CODE_ERROR</code>), silently dropping production turns from the evaluation dataset.</li>
+        </ul>
+        <p style="margin-top: 14px;">
+          <a href="otel-context-detachment-and-evals.html" class="subpage-card-link" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--accent);">
+            <span>📖 Read the complete empirical autopsy in Annexe: OpenTelemetry Context Detachment &amp; Online Evals</span> &rarr;
+          </a>
+        </p>
+      </div>
+    </article>
+
+    <!-- ISSUE 33: PILLAR 4 - DEPLOYED AGENT BIGQUERY IAM INGESTION GAP -->
+    <article class="step-card" id="issue-deployed-bigquery-iam">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 33 · Pillar 4 (Optimise)</span>
+          <h2 class="step-title">The Deployed Agent BigQuery Ingestion Gap: Missing Agent Identity IAM</h2>
+        </div>
+      </div>
+      <div class="step-body">
+        <p>
+          <strong>The Context:</strong> In the instructor's private demo script (<code>docs/instructor/lab-4-demo-script.md</code>), instructors were cautioned: <em>"Do not claim... BigQuery rows written by a deployed agent. We verified the local path end to end."</em> In Step 5, we deployed our agent with <code>BQ_ANALYTICS_DATASET=agent_analytics</code> and pushed a live turn via <code>streamQuery</code>.
+        </p>
+        <p>
+          <strong>The Empirical Audit:</strong> Auditing <code>agent_events</code> via <code>bq query</code> confirmed that while the local smoke turn wrote 43 rows, the deployed turn added <strong>zero additional rows</strong>. The table remained at exactly 43 events.
+        </p>
+        <p>
+          <strong>The Root Cause:</strong> In Lab 2, <code>gcp-setup.sh</code> provisioned the agent's cryptographic identity (<code>principal://agents.global...</code>) with logging, tracing, and storage roles, but <strong>omitted <code>roles/bigquery.dataEditor</code></strong> on the BigQuery dataset. When the deployed container's <code>BigQueryAgentAnalyticsPlugin</code> attempted to stream rows via the Storage Write API, Google Cloud denied the write. Because the plugin intentionally swallows write errors to prevent breaking the chat stream, the failure was completely silent.
+        </p>
+        <p>
+          <strong>The Resolution:</strong> Documented the required IAM grant binding <code>roles/bigquery.dataEditor</code> to the Agent Engine principalSet, unlocking full cloud-native telemetry ingestion.
+        </p>
+      </div>
+    </article>
+
     <!-- Footer -->
     <footer>
       <div><a href="index.html">← Back to Overview</a> | <a href="lab-4.html">View Lab 4 Walkthrough →</a></div>
