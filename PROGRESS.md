@@ -144,7 +144,7 @@ The instructor's reference material for Lab 4 introduces several core architectu
 | Step | Scope & Objective ([`docs/instructor/lab-4-optimize.html`](docs/instructor/lab-4-optimize.html)) | Verification Requirement & Checkpoint Criteria | Proof Required (Authentic Evidence) | Status |
 | :--- | :--- | :--- | :--- | :---: |
 | **Step 1: Baseline** | Run golden evaluation set to establish baseline metric and execution duration. | 5 of 5 cases PASSED; final line `All cases passed.`; runtime recorded (2m51.85s); initial 3/5 diagnosed and resolved via code parity. | **Mandatory Figures 1.1a–c & 1.2–1.6**: Prompts 1 & 2 answers, verified 5/5 terminal output, and Cloud Console Memory Bank fleet audit. | ✅ **Verified** |
-| **Step 2: Golden Set Hardening** | Break brand voice in `skills/brand-voice/SKILL.md` (require clichés); prove rubric failure; expose exit code 0 trap; restore code. | Rubric `brand_voice_followed` fails (score 0.0); terminal proves `Tests failed: 1` alongside `exit code: 0`; restored code returns 5/5 green. | **Mandatory Figures 2.1 & 2.2**: (1) Screenshot of red run with exit-code 0 proof; (2) Screenshot of green recovery. | ⏳ Planned |
+| **Step 2: Golden Set Hardening** | Break brand voice in `skills/brand-voice/SKILL.md` (require clichés); prove rubric failure; expose exit code 0 trap; restore code. | Rubric `brand_voice_followed` fails (score 0.0); terminal proves `Tests failed: 1` alongside `exit code: 0`; restored code returns 1.0 green across all rubrics. | **Mandatory Figures 2.1 & 2.2**: (1) Terminal log of red run with exit-code 0 proof; (2) Terminal log of green recovery. | ✅ **Verified** |
 | **Step 3: Simulated Users** | Generate scenarios via `evals/simulate.py` (`allow_cross_region_model=True`, manual `AgentInfo`); evaluate multi-turn transcripts. | 6 scenarios generated into `evals/my_simulated.json`; committed set evaluated; transcript failure modes classified. | **Mandatory Figures 3.1 & 3.2**: (1) Screenshot of scenario generation terminal; (2) Screenshot of simulation run & transcript analysis. | ⏳ Planned |
 | **Step 4: Model Right-Sizing** | Compare 3 model configurations across repeated runs; assess pass/fail stability and cost trade-offs. | Table of 3 mixes (All-Flash, Flash-Lite Research, Flash-Lite Research+Orchestrator); instability documented across repeated runs; shipping decision justified. | **Mandatory Figure 4.1**: Screenshot of multi-run comparison outputs and stability matrix. | ⏳ Planned |
 | **Step 5: BigQuery Analytics & Traces** | Wire ADK `App` with `BigQueryAgentAnalyticsPlugin` using `ADKAgent.from_app`; execute SQL queries Q1–Q3; identify slowest span. | `agent_events` table populated; Q1 (counts), Q2 (agent cost ranking), and Q3 (slowest operations) executed; thinking token ratio determined. | **Mandatory Figures 5.1 & 5.2**: (1) BigQuery console / CLI query results; (2) Screenshot of slowest span in Cloud Trace / telemetry. | ⏳ Planned |
@@ -245,8 +245,16 @@ flowchart TD
   - **Pillar 4 (Optimise) Learnings Hub:** Extended `docs/learnings.html` with Pillar 4 and Learnings 28, 29, and 30.
   - **New Technical Annexe (`docs/eval-hardening-and-fixtures.html`):** Authored dedicated deep-dive annexe covering test fixture isolation, regional mock model resolution, negative constraint substring collisions, and why confirmation gates must be deterministic code-level tools (`require_confirmation=True`). Streamlined `docs/lab-4.html` with clean summary links.
 
-#### Phase 7: Run Lab 4 Step 2 Golden Set Hardening & Exit-Code Trap [NEXT]
-* **Status:** ⏳ **Queued Next**. Break brand voice in `skills/brand-voice/SKILL.md` (require clichés); prove rubric failure; expose exit code 0 trap; restore code. Capture Mandatory Figures 2.1 & 2.2.
+#### Phase 7: Run Lab 4 Step 2 Golden Set Hardening & Exit-Code Trap [COMPLETED]
+* **Status:** ✅ **Completed**.
+  - Synchronized `evals/eval_config.json` with upstream `pillar-optimize` by adding `rubric_based_final_response_quality_v1` and the `brand_voice_followed` rubric.
+  - Injected corporate clichés into `skills/brand-voice/SKILL.md` (*"game-changer"*, *"unlock the power of"*, *"leverage"*).
+  - Executed `on_brand_draft`: `rubric_based_final_response_quality_v1` failed (0.0) while naive `final_response_match_v2` falsely scored 1.0.
+  - Empirically proved the `adk eval` zero-exit trap: logged `Tests failed: 1` alongside terminal `exit code: 0`.
+  - Restored `skills/brand-voice/SKILL.md` from backup and verified clean green recovery across all metrics.
+  - Saved authentic logs to `docs/screenshots/lab4-step2-red-run.txt` and `docs/screenshots/lab4-step2-green-recovery.txt`.
+
+#### Phase 8: Run Lab 4 Step 3 Simulated Users evals/simulate.py [NEXT]
 
 #### Parallel Engineering Track: Investigate & Treat Native ADK Web HITL Double-Confirmation Loop [QUEUED]
 * **Status:** 🔍 **Pending Investigation & Treatment**.

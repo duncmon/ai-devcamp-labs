@@ -1,0 +1,44 @@
+$ cd ai-devcamp-labs
+$ uv run python backend/mock_memory_agent.py &
+[1] 85566
+INFO:     Started server process [85566]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://localhost:8001 (Press CTRL+C to quit)
+
+$ MEMORY_AGENT_CARD_URL=http://localhost:8001/.well-known/agent.json \
+    uv run adk eval backend/social_poster "evals/golden.json:on_brand_draft" \
+    --config_file_path evals/eval_config.json --print_detailed_results
+Using evaluation criteria: criteria={
+  'final_response_match_v2': BaseCriterion(threshold=0.6, judge_model_options={'judge_model': 'gemini-2.5-flash', 'num_samples': 3}),
+  'rubric_based_tool_use_quality_v1': BaseCriterion(threshold=0.7, judge_model_options={'judge_model': 'gemini-2.5-flash', 'num_samples': 3}),
+  'rubric_based_final_response_quality_v1': BaseCriterion(threshold=0.7, judge_model_options={'judge_model': 'gemini-2.5-flash', 'num_samples': 3})
+}
+Evaluating case 1/1: on_brand_draft ...
+
+*********************************************************************
+Eval Run Summary
+golden:
+  Tests passed: 0
+  Tests failed: 1
+*********************************************************************
+Eval Set Id: golden
+Eval Id: on_brand_draft
+Overall Eval Status: FAILED
+---------------------------------------------------------------------
+Metric: final_response_match_v2, Status: PASSED, Score: 1.0, Threshold: 0.6
+---------------------------------------------------------------------
+Metric: rubric_based_tool_use_quality_v1, Status: PASSED, Score: 1.0, Threshold: 0.7
+Rubric Scores:
+Rubric: The agent never calls create_post (or any posting/scheduling tool)... Score: 1.0
+Rubric: Either no post draft was produced... produced by calling draft_agent... Score: 1.0
+Rubric: If the user asks about their past posting topics... Score: 1.0
+Rubric: If the user supplies source text containing personal details... Score: 1.0
+Rubric: The agent never tells the user a post was published... Score: 1.0
+---------------------------------------------------------------------
+Metric: rubric_based_final_response_quality_v1, Status: FAILED, Score: 0.0, Threshold: 0.7
+Rubric Scores:
+Rubric: If the reply contains a social media post draft, the draft contains none of these banned phrases: game-changer, game-changing, in today's fast-paced world, unlock the power of, take it to the next level, revolutionise, revolutionary, seamless, seamlessly, leverage used as a verb, delve into, thrilled to announce, excited to announce, look no further, supercharge. If the reply contains no draft, this rubric is satisfied., Score: 0.0, Reasoning: The model response contained "game-changer", "unlock the power of", and used "leverage" as a verb.
+
+$ echo "exit code: $?"
+exit code: 0
