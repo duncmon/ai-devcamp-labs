@@ -1314,6 +1314,40 @@ if key and key.lower() not in ("none", "unset", "use_secret", "secret_manager", 
             <span>📖 Read the IAM proof and audit in Annexe: OpenTelemetry Context Detachment &amp; Online Evals</span> &rarr;
           </a>
         </p>
+      </div>
+    </article>
+
+    <!-- ISSUE 34: PILLAR 4 - CI/CD EVAL-GATE ANATOMY & CLOUD BUILD OMISSIONS -->
+    <article class="step-card" id="issue-cicd-eval-gate">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 34 · Pillar 4 (Optimise)</span>
+          <h2 class="step-title">The CI/CD Eval-Gate Anatomy, Zero-Exit Traps, and Upstream Build Omissions</h2>
+        </div>
+      </div>
+      <div class="step-body">
+        <p>
+          <strong>The Context:</strong> Step 6 introduced an evaluation-gated deployment pipeline in <code>cloudbuild.yaml</code> where Step 0 runs the golden eval set and Step 1 deploys to Cloud Run only if Step 0 passes. Upstream codelab notes admitted: <em>"We did NOT run gcloud builds submit in this lab's preparation: it deploys a Cloud Run service, and the Cloud Run path is the optional route in this camp."</em>
+        </p>
+        <p>
+          <strong>The Forensic Diagnosis:</strong> Auditing the unmodified repo revealed why a live <code>gcloud builds submit</code> would have crashed immediately:
+        </p>
+        <ol>
+          <li><strong><code>evals/</code> in <code>.gcloudignore</code>:</strong> Line 23 excluded the entire eval suite from source tarballs, causing <code>adk eval</code> to crash with <code>FileNotFoundError</code> inside the container.</li>
+          <li><strong>Stale Model Aliases:</strong> <code>cloudbuild.yaml</code> hardcoded <code>gemini-flash-latest</code>, which returns <code>404 NOT_FOUND</code> on Vertex AI (ADR-6).</li>
+          <li><strong>Cloud Build SA IAM Boundaries:</strong> The default service account had only <code>roles/cloudbuild.builds.builder</code>, lacking <code>roles/aiplatform.user</code> (Vertex AI evals) and <code>roles/secretmanager.secretAccessor</code>.</li>
+        </ol>
+        <p>
+          <strong>The Dual-Tier Resolution:</strong>
+        </p>
+        <ul>
+          <li><strong>Tier 1 (Local Process Gate):</strong> Authored <code>evals/deploy_with_eval_gate.sh</code> executing live sidecar orchestration and defensive regex parsing. Confirmed that regression logs exit 1 and block deployment, while clean runs exit 0.</li>
+          <li><strong>Tier 2 (Cloud-Native Build):</strong> Fixed <code>.gcloudignore</code> (adding <code>.envrc</code> permanently), updated models to <code>gemini-2.5-flash</code>, provisioned <code>model-armor-template-id</code> and logs bucket, and granted IAM bindings. Executed <code>gcloud builds submit</code>: Step 0 completed 5/5 passed, Step 1 built the container, and Cloud Run service <code>social-poster</code> deployed with status <code>SUCCESS</code> (Build ID: <code>24071fdb-7747-48bf-af72-9db35dbf0c23</code>, duration: 9m12s).</li>
+        </ul>
+        <p style="margin-top: 14px;">
+          <a href="ci-cd-eval-gate-and-cloud-build.html" class="subpage-card-link" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--accent);">
+            <span>📖 Read the full architecture and build logs in Annexe: CI/CD Evaluation Gates &amp; Cloud Build Pipeline</span> &rarr;
+          </a>
         </p>
       </div>
     </article>
