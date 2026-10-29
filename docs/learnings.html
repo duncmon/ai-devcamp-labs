@@ -1211,6 +1211,51 @@ if key and key.lower() not in ("none", "unset", "use_secret", "secret_manager", 
       </div>
     </article>
 
+    <!-- ISSUE 31: PILLAR 4 - MEMORY LEAKAGE & PROGRESSIVE DISCLOSURE BLIND SPOT -->
+    <article class="step-card" id="issue-progressive-disclosure-blindspot">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 31 · Pillar 4 (Optimise)</span>
+          <h2 class="step-title">The Memory Leakage &amp; Progressive Disclosure Blind Spot in Agent Evaluations</h2>
+        </div>
+      </div>
+      <div class="step-body">
+        <p>
+          <strong>The Context:</strong> In Lab 4 Step 2, the brand-voice skill (<code>skills/brand-voice/SKILL.md</code>) is deliberately corrupted with mandatory clichés (<em>"game-changer"</em>, <em>"unlock the power of"</em>, <em>"leverage"</em> as a verb) to prove that the rubric-based evaluator (<code>brand_voice_followed</code>) catches the failure while naive semantic matching passes.
+        </p>
+        <p>
+          <strong>The Difficulty:</strong> When attendees executed the test, the case unexpectedly <strong>PASSED with Score 1.0</strong>! The draft contained zero clichés, successfully evading the rubric despite the skill file being corrupted.
+        </p>
+        <p>
+          <strong>The Forensic Diagnosis (Two Cascading Flaws):</strong>
+        </p>
+        <ol>
+          <li>
+            <strong>Memory Context Leakage Across Subagents:</strong> When <code>mock_memory_agent.py</code> ran in the background, the orchestrator queried it and received a canned user profile: <em>"Your writing voice features: ... A lack of hype words."</em> The orchestrator forwarded this into <code>draft_agent</code>'s runtime prompt as <code>"Avoid hype words."</code> This runtime instruction directly contradicted <code>SKILL.md</code>, commanding the drafting model to suppress the clichés.
+          </li>
+          <li>
+            <strong>Stochastic Tool-Call Skipping Under <code>Mode.AUTO</code>:</strong> By inspecting the session state delta in the eval JSON (<code>_adk_activated_skill_draft_agent</code>), we discovered that <code>draft_agent</code> selectively called <code>load_skill("post-formatter")</code> and <strong>completely skipped calling <code>load_skill("brand-voice")</code></strong>. Because function calling operated in default <code>Mode.AUTO</code>, the model treated the instruction to load skills as an optional suggestion rather than a mandatory contract.
+          </li>
+          <li>
+            <strong>The Evaluation Coverage Gap:</strong> While <code>evals/eval_config.json</code> contained rubrics for <code>create_post</code>, <code>draft_agent</code>, and <code>redact_pii_text</code>, it had <strong>zero rubrics verifying whether <code>load_skill</code> was actually executed</strong>. The test suite was completely blind to whether progressive disclosure took place.
+          </li>
+        </ol>
+        <p>
+          <strong>The Solution:</strong>
+        </p>
+        <ul>
+          <li><strong>Mandatory Skill Tool-Call Prompting:</strong> Updated Rule 1 in <code>backend/social_poster/agent.py</code>: <em>"you MUST call load_skill for brand-voice (tone), post-formatter (structure), and platform-style. NEVER write draft text without calling load_skill for brand-voice."</em></li>
+          <li><strong>Memory Isolation:</strong> Explicitly unset <code>MEMORY_AGENT_CARD_URL=""</code> for isolated drafting evaluations to prevent memory profile leakage.</li>
+          <li><strong>Eval Suite Hardening:</strong> Added the <code>brand_voice_skill_consulted</code> rubric to <code>evals/eval_config.json</code> under <code>rubric_based_tool_use_quality_v1</code>, ensuring any future run fails closed if an agent hallucinates drafts without activating the brand-voice skill.</li>
+        </ul>
+        <p style="margin-top: 14px;">
+          <a href="progressive-disclosure-and-skill-evals.html" class="subpage-card-link" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--accent);">
+            <span>📖 Read the dedicated deep-dive in Annexe: Progressive Disclosure &amp; Skill Invariants</span> &rarr;
+          </a>
+        </p>
+      </div>
+    </article>
+
     <!-- Footer -->
     <footer>
       <div><a href="index.html">← Back to Overview</a> | <a href="lab-4.html">View Lab 4 Walkthrough →</a></div>

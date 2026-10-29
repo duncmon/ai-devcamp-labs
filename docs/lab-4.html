@@ -544,6 +544,11 @@ Isn't it time we prioritised learning by doing?
 How does this look? Shall I post it to LinkedIn?</code></pre>
         </div>
 
+        <figure class="step-figure" style="margin: 20px 0;">
+          <img src="screenshots/lab4-step2-red-run.png" alt="Figure 2.1: Authentic terminal proof showing on_brand_draft rubric failure (Score: 0.0), semantic match passing (Score: 1.0), and exit code 0" class="lightbox-trigger">
+          <figcaption><strong>Figure 2.1:</strong> Authentic terminal verification of the Step 2 red run: <code>rubric_based_final_response_quality_v1</code> failing with <code>Score: 0.0</code> on corrupted clichés, naive semantic similarity passing with <code>Score: 1.0</code>, and the <code>adk eval</code> command exiting with code <code>0</code> despite <code>Tests failed: 1</code>.</figcaption>
+        </figure>
+
         <h4>Two Crucial Engineering Insights</h4>
         <ol>
           <li>
@@ -603,6 +608,35 @@ It's time to rethink how we learn and develop. Move beyond listening and start d
 
 Would you like me to post this to LinkedIn?</code></pre>
         </div>
+
+        <h3>6. Forensic Post-Mortem: Memory Leakage &amp; The Progressive Disclosure Blind Spot</h3>
+        <p>
+          During live attendee testing of Step 2, an extraordinary diagnostic phenomenon emerged: on several runs with corrupted clichés in <code>SKILL.md</code>, the test <strong>unexpectedly passed</strong>! Investigating the internal execution trace JSON files (<code>.adk/eval_history/*.evalset_result.json</code>) revealed two critical architectural vulnerabilities that had gone completely undetected in upstream workshop materials:
+        </p>
+
+        <div class="callout warning">
+          <p><strong>Two Discovered Vulnerabilities (Learning 31):</strong></p>
+          <ol style="margin: 8px 0 0; padding-left: 18px;">
+            <li>
+              <strong>Cross-Agent Memory Profile Leakage:</strong> When <code>mock_memory_agent.py</code> ran on <code>:8001</code>, the orchestrator queried it and received a canned profile: <em>"Your writing voice features: ... A lack of hype words."</em> The orchestrator forwarded this into <code>draft_agent</code>'s prompt as <code>"Avoid hype words."</code> This runtime prompt directly contradicted the corrupted <code>SKILL.md</code>, causing the drafting model to prioritize prompt instructions over disk skills and strip the clichés!
+            </li>
+            <li>
+              <strong>Stochastic Tool-Call Skipping Under <code>Mode.AUTO</code>:</strong> By inspecting the session state delta (<code>_adk_activated_skill_draft_agent</code>), we discovered that <code>draft_agent</code> selectively called <code>load_skill("post-formatter")</code> and <strong>completely skipped calling <code>load_skill("brand-voice")</code></strong>! Under default Gemini tool configuration (<code>Mode.AUTO</code>), the model treated skill loading as an optional suggestion, drafting copy without ever consulting brand voice.
+            </li>
+            <li>
+              <strong>The Missing Tool Evaluation Gap:</strong> While <code>evals/eval_config.json</code> verified post tools, drafting delegation, and PII redaction, it had <strong>zero rubrics verifying whether <code>load_skill</code> was executed</strong>.
+            </li>
+          </ol>
+        </div>
+
+        <p><strong>Engineering Fixes Applied:</strong></p>
+        <ul>
+          <li><strong>Mandatory Skill Prompting:</strong> Updated <code>backend/social_poster/agent.py</code> to mandate: <em>"you MUST call load_skill for brand-voice (tone), post-formatter (structure), and platform-style. NEVER write draft text without calling load_skill for brand-voice."</em></li>
+          <li><strong>Hardened Rubric:</strong> Added <code>brand_voice_skill_consulted</code> to <code>evals/eval_config.json</code> under <code>rubric_based_tool_use_quality_v1</code>.</li>
+        </ul>
+        <p style="margin-top: 14px;">
+          👉 <em>For the complete forensic dissection and state delta analysis, see our dedicated <a href="progressive-disclosure-and-skill-evals.html" style="font-weight: 700; color: var(--accent);">Annexe: Progressive Disclosure &amp; Skill Invariants →</a> (and <a href="learnings.html#issue-progressive-disclosure-blindspot" style="font-weight: 600; color: var(--accent);">Learning 31</a> in the Learnings Hub).</em>
+        </p>
 
         <p>
           With both red failure and green recovery verified, Step 2 is 100% complete. The exit-code trap has been proven empirically, and the role of specialized response quality rubrics over generic semantic matching has been established.

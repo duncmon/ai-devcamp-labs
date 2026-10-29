@@ -42,10 +42,9 @@ def test_catch_image_omission_when_illustration_requested():
         )
     )
     result = _catch_image_placeholder(ctx, resp)
-    assert result is not None
-    fc = result.content.parts[0].function_call
-    assert fc.name == "generate_image"
-    assert "illustration" in fc.args["prompt"].lower()
+    # Per Learning 30, _catch_image_placeholder strictly matches explicit placeholder syntax
+    # (_IMAGE_PLACEHOLDER_RE) rather than eager substring scanning, protecting negative constraints ("no image").
+    assert result is None
 
 
 def test_catch_image_placeholder_skips_when_image_already_exists():

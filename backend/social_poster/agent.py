@@ -335,9 +335,10 @@ Image already generated for the CURRENT post, if any (empty means none yet):
   hosted URL: {{current_image_url?}}
 
 Rules:
-1. Load and follow the relevant skills before drafting: post-formatter
-   (structure), platform-style (rules for the target platform), and
-   brand-voice (tone).
+1. Load and follow the relevant skills before drafting: you MUST call
+   load_skill for brand-voice (tone), post-formatter (structure), and
+   platform-style (rules for the target platform). NEVER write draft text
+   without calling load_skill for brand-voice.
 2. Ground the draft in the research notes when they exist; never invent facts.
 3. Illustration / Image Generation:
    - When the user asks for an illustration, image, graphic, or visual (e.g. "with an illustration", "add an image", "illustrate it"): YOU MUST CALL generate_image. Load the poster-style skill first, formulate a vivid, creative visual prompt describing a recognizable editorial scene or metaphor, and ACTUALLY CALL generate_image. Never omit it, and never write a placeholder like "(Image: ...)" instead of calling the tool.{_GCS_UPLOAD_STEP}

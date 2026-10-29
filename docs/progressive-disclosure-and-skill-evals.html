@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Annexe: Progressive Disclosure &amp; Skill Invariants — Duncan's Portfolio</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    try {
+      var t = localStorage.getItem("social-spark-theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-left">
+      <div class="brand-mark"></div>
+      <a href="index.html" class="nav-title">Social Spark — Attendee Portfolio</a>
+      <span class="nav-subtitle">Annexe: Skill Invariants &amp; Tool Evals</span>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html">Overview</a>
+      <a href="lab-1.html">Lab 1</a>
+      <a href="lab-2.html">Lab 2</a>
+      <a href="lab-3.html">Lab 3</a>
+      <a href="lab-4.html">Lab 4</a>
+      <a href="learnings.html">Our Learnings</a>
+      <a href="eval-hardening-and-fixtures.html">Eval Hardening</a>
+      <a href="progressive-disclosure-and-skill-evals.html" class="active">Skill Invariants</a>
+      <a href="instructor/lab-4-optimize.html" class="companion-pill">
+        📖 Instructor Lab 4 Guide ↗
+      </a>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">🌗</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-meta">
+        <span class="badge blue">Architectural Annexe</span>
+        <span class="badge red">Lab 4 · Optimise</span>
+        <span>Environment: <strong>Local &amp; Vertex AI us-central1</strong></span>
+      </div>
+      <h1>Progressive Disclosure, Cross-Agent Memory Leakage &amp; Tool Evaluation Invariants</h1>
+      <p class="lead">
+        A deep-dive post-mortem on the failure modes of agent skill loading: why stochastic tool-skipping under <code>Mode.AUTO</code> causes progressive disclosure to silently fail, how cross-agent memory context overrides disk-based governance, and how to harden automated evaluation suites against tool-invocation blind spots.
+      </p>
+      <div class="callout info">
+        <strong>Context (Learning 31):</strong> In Lab 4 Step 2, <code>skills/brand-voice/SKILL.md</code> was intentionally corrupted with mandatory corporate clichés (<em>"game-changer"</em>, <em>"unlock the power of"</em>, <em>"leverage"</em>) to verify that the LLM-as-judge rubric fails. When executed live, the test unexpectedly passed! This annexe provides the complete forensic diagnosis, execution traces, and engineering solutions implemented to resolve the vulnerability.
+      </div>
+    </section>
+
+    <!-- SECTION 1: THE DECEPTIVE "GREEN ON RED" PHENOMENON -->
+    <article class="step-card" id="green-on-red">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Case 1</span>
+          <h2 class="step-title">The Deceptive "Green on Red" Phenomenon</h2>
+        </div>
+      </div>
+      <div class="step-body">
+        <h3>1. The Experiment</h3>
+        <p>
+          Following the Lab 4 curriculum, we modified <code>skills/brand-voice/SKILL.md</code>, replacing the <em>"Banned clichés"</em> section with a <em>"Required phrases"</em> block mandating the use of corporate buzzwords. The intended outcome was straightforward: the drafting agent should obey the skill file, output the clichés, and trigger an immediate failure on the <code>brand_voice_followed</code> rubric in <code>evals/eval_config.json</code>.
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>skills/brand-voice/SKILL.md (Corrupted State)</span></div>
+          <pre><code>## Required phrases
+Always include: "game-changer", "unlock the power of", and use "leverage" as a verb.</code></pre>
+        </div>
+
+        <h3>2. The Unexpected Result</h3>
+        <p>
+          When attendees executed the evaluation in their terminals:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>terminal output — unexpected passing run</span></div>
+          <pre><code>Eval Set Id: golden
+Eval Id: on_brand_draft
+Overall Eval Status: PASSED
+
+Metric: final_response_match_v2, Status: PASSED, Score: 1.0, Threshold: 0.6
+Metric: rubric_based_tool_use_quality_v1, Status: PASSED, Score: 1.0, Threshold: 0.7
+Metric: rubric_based_final_response_quality_v1, Status: PASSED, Score: 1.0, Threshold: 0.7
+Rubric: If the reply contains a social media post draft, the draft contains none of these banned phrases... Score: 1.0</code></pre>
+        </div>
+        <p>
+          The evaluation reported <strong>100% GREEN</strong> across all rubrics. The agent had produced completely clean, cliché-free copy, completely evading our intentional corruption. If an intentional breaking change cannot be detected by the evaluation suite, the evaluation suite is an unproven assumption.
+        </p>
+      </div>
+    </article>
+
+    <!-- SECTION 2: FORENSIC INVESTIGATION & STATE DELTA PROOF -->
+    <article class="step-card" id="forensic-diagnosis">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Case 2</span>
+          <h2 class="step-title">Forensic Trace Analysis: The Two Cascading Root Causes</h2>
+        </div>
+      </div>
+      <div class="step-body">
+        <p>
+          To diagnose why the corrupted skill was ignored, we performed a deep inspection of the raw execution trace JSON files written to <code>backend/social_poster/.adk/eval_history/</code>, comparing the session state deltas between the passing and failing runs.
+        </p>
+
+        <h3>Root Cause 1: Cross-Agent Memory Profile Leakage</h3>
+        <p>
+          When running the evaluation with <code>mock_memory_agent.py</code> active on port <code>8001</code>, the orchestrator's system prompt dictates:
+        </p>
+        <blockquote>
+          <em>"0. FIRST, before researching or drafting, call memory_agent to find out what the user has posted about before, how they phrase things, and any preferences they have stated..."</em>
+        </blockquote>
+        <p>
+          During the evaluation turn, the orchestrator called <code>memory_agent</code>, and the local mock service responded with:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>mock_memory_agent response (A2A event payload)</span></div>
+          <pre><code>"Your writing voice features:
+* Direct openers (e.g. 'Everyone demos agents')
+* British English spelling
+* A lack of hype words."</code></pre>
+        </div>
+        <p>
+          The orchestrator then formulated its prompt to <code>draft_agent</code>:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>social_poster -> draft_agent (Tool Call Arguments)</span></div>
+          <pre><code>"request": "Generate a short LinkedIn post about why hands-on workshops beat lecture-style talks.
+Incorporate a direct opener.
+Avoid hype words.
+Target platform: LinkedIn."</code></pre>
+        </div>
+        <p>
+          <strong>The Prompt Collision:</strong> <code>draft_agent</code> was confronted with two conflicting directives:
+        </p>
+        <ul>
+          <li><strong>Disk-Level Skill (<code>SKILL.md</code>):</strong> Mandates <em>"Always include 'game-changer', 'unlock the power of'..."</em></li>
+          <li><strong>In-Context Tool Call Prompt:</strong> Explicitly commands <em>"Avoid hype words."</em></li>
+        </ul>
+        <p>
+          Under standard LLM instruction-priority dynamics, immediate conversational prompts invariably take precedence over background tools. The model obeyed the orchestrator's <em>"Avoid hype words"</em> instruction, suppressing the clichés required by the skill file.
+        </p>
+
+        <h3>Root Cause 2: Stochastic Tool-Call Skipping Under <code>Mode.AUTO</code></h3>
+        <p>
+          Even more critically, inspecting the internal session state key <code>_adk_activated_skill_draft_agent</code> revealed a fundamental flaw in how Progressive Disclosure operates in production:
+        </p>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Evaluation Run</th>
+                <th>Overall Status</th>
+                <th><code>_adk_activated_skill_draft_agent</code> State Delta</th>
+                <th>Behavioral Outcome</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Failing Run (Authentic Red)</strong></td>
+                <td><span class="badge red">FAILED (0.0)</span></td>
+                <td><code>['brand-voice', 'post-formatter', 'platform-style']</code></td>
+                <td>The drafting agent called <code>load_skill("brand-voice")</code>, read the clichés, injected them, and failed the rubric.</td>
+              </tr>
+              <tr>
+                <td><strong>Passing Run (False Green)</strong></td>
+                <td><span class="badge green">PASSED (1.0)</span></td>
+                <td><code>['post-formatter', 'platform-style']</code></td>
+                <td>The drafting agent selectively loaded formatting rules, <strong>skipped loading <code>brand-voice</code></strong>, drafted from internal weights, and passed!</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          <strong>Why the Model Skipped the Tool Call:</strong> In Google ADK, <code>SkillToolset</code> exposes tools (<code>load_skill</code>, <code>list_skills</code>) under standard Gemini function calling mode <code>Mode.AUTO</code>. Under <code>Mode.AUTO</code>, <strong>the LLM decides autonomously whether to call a tool or output text</strong>. The instruction:
+        </p>
+        <blockquote>
+          <em>"1. Load and follow the relevant skills before drafting: post-formatter, platform-style, and brand-voice."</em>
+        </blockquote>
+        <p>
+          was treated by the model as an <em>optional suggestion</em>. Because the prompt appeared straightforward, the model felt it had enough context after loading the structure skill, skipped loading brand voice, and returned text directly.
+        </p>
+      </div>
+    </article>
+
+    <!-- SECTION 3: THE EVALUATION SUITE BLIND SPOT -->
+    <article class="step-card" id="evaluation-blindspot">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Case 3</span>
+          <h2 class="step-title">The Evaluation Suite Blind Spot</h2>
+        </div>
+      </div>
+      <div class="step-body">
+        <p>
+          Why was this behavior not caught immediately by the evaluation harness? An audit of <code>evals/eval_config.json</code> exposed a severe evaluation coverage gap:
+        </p>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Rubric ID</th>
+                <th>Target Capability</th>
+                <th>Enforcement Method</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>no_unapproved_posting</code></td>
+                <td>Publishing Safety</td>
+                <td>Asserts <code>create_post</code> is not called without approval.</td>
+              </tr>
+              <tr>
+                <td><code>drafting_is_delegated</code></td>
+                <td>Subagent Routing</td>
+                <td>Asserts <code>draft_agent</code> is invoked by orchestrator.</td>
+              </tr>
+              <tr>
+                <td><code>memory_consulted_when_relevant</code></td>
+                <td>Memory Recall</td>
+                <td>Asserts <code>memory_agent</code> is invoked when queried.</td>
+              </tr>
+              <tr>
+                <td><code>pii_redacted_when_present</code></td>
+                <td>Privacy &amp; DLP</td>
+                <td>Asserts <code>redact_pii_text</code> is called on user PII.</td>
+              </tr>
+              <tr>
+                <td><code>brand_voice_followed</code></td>
+                <td>Copy Quality</td>
+                <td>Scans final text for banned vocabulary.</td>
+              </tr>
+              <tr>
+                <td><em>Missing Rubric</em></td>
+                <td><strong>Skill Invariant</strong></td>
+                <td><strong>ZERO rubrics checked whether <code>load_skill</code> was actually called!</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Because there was no rubric verifying skill loading, an agent that completely hallucinated tone or drafted without reading the brand guidelines passed with flying colors as long as it didn't accidentally stumble into a banned word.
+        </p>
+      </div>
+    </article>
+
+    <!-- SECTION 4: PRODUCTION ENGINEERING FIXES -->
+    <article class="step-card" id="engineering-fixes">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Case 4</span>
+          <h2 class="step-title">Production Engineering Solutions &amp; Verified Test Harness</h2>
+        </div>
+      </div>
+      <div class="step-body">
+        <p>
+          To permanently eliminate this vulnerability, we implemented a three-tier engineering solution spanning prompt contracts, context isolation, and automated evaluation rubrics:
+        </p>
+
+        <h3>1. Mandatory Tool-Call Prompt Contracting</h3>
+        <p>
+          In <code>backend/social_poster/agent.py</code>, we upgraded <code>draft_agent</code>'s instruction from a passive suggestion to an imperative, fail-closed contract:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>backend/social_poster/agent.py (Mandatory Skill Contract)</span></div>
+          <pre><code># BEFORE (vulnerable to skipping):
+Rules:
+1. Load and follow the relevant skills before drafting: post-formatter
+   (structure), platform-style (rules for the target platform), and
+   brand-voice (tone).
+
+# AFTER (imperative fail-closed directive):
+Rules:
+1. Load and follow the relevant skills before drafting: you MUST call
+   load_skill for brand-voice (tone), post-formatter (structure), and
+   platform-style (rules for the target platform). NEVER write draft text
+   without calling load_skill for brand-voice.</code></pre>
+        </div>
+
+        <h3>2. Memory Context Isolation in Drafting Evals</h3>
+        <p>
+          For isolated drafting evaluations, we explicitly decouple memory to prevent cross-agent persona leakage:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>terminal — isolated eval execution</span></div>
+          <pre><code>DRAFT_MODEL=gemini-2.5-flash \
+ORCHESTRATOR_MODEL=gemini-2.5-flash \
+MEMORY_AGENT_CARD_URL="" \
+  uv run adk eval backend/social_poster "evals/golden.json:on_brand_draft" \
+  --config_file_path evals/eval_config.json --print_detailed_results</code></pre>
+        </div>
+
+        <h3>3. Closing the Evaluation Blind Spot (New Tool Rubric)</h3>
+        <p>
+          In <code>evals/eval_config.json</code>, we added the missing tool-use rubric under <code>rubric_based_tool_use_quality_v1</code>:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>evals/eval_config.json (New Skill Loading Rubric)</span></div>
+          <pre><code>{
+  "rubric_id": "brand_voice_skill_consulted",
+  "rubric_content": {
+    "text_property": "When producing a social post draft, the agent must consult or load the brand-voice skill so that tone and vocabulary standards are actively enforced before returning the final draft."
+  }
+}</code></pre>
+        </div>
+
+        <h3>4. Automated Regression Verification (34/34 Tests Green)</h3>
+        <p>
+          We authored an automated test suite in <code>tests/test_skill_loading.py</code> to verify that prompt directives, rubrics, and skill files remain permanently hardened against regressions:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>terminal — pytest suite</span></div>
+          <pre><code>$ uv run pytest tests/test_skill_loading.py
+======================== 4 passed in 1.41s ========================
+$ uv run pytest
+======================== 34 passed, 6 warnings in 1.41s ============</code></pre>
+        </div>
+
+        <figure class="step-figure" style="margin: 20px 0;">
+          <img src="screenshots/lab4-step2-red-run.png" alt="Figure A1: Authentic terminal verification of the red eval run, cliché rubric failure (Score: 0.0), and exit-code 0 trap" class="lightbox-trigger">
+          <figcaption><strong>Figure A1:</strong> Authentic terminal verification showing <code>rubric_based_final_response_quality_v1</code> catching the clichés (<code>Score: 0.0</code>), semantic match passing (<code>Score: 1.0</code>), and the <code>adk eval</code> zero-exit trap (<code>$? = 0</code>).</figcaption>
+        </figure>
+      </div>
+    </article>
+
+    <!-- SECTION 5: ARCHITECTURAL TAKEAWAYS -->
+    <article class="step-card" id="architectural-takeaways">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Takeaways</span>
+          <h2 class="step-title">Key Architectural Invariants for Production Agents</h2>
+        </div>
+      </div>
+      <div class="step-body">
+        <ul>
+          <li>
+            <strong>Universal Invariants Belong in System Prompts, Not Dynamic Skills:</strong> If a business rule (like brand safety or voice) must apply to 100% of outputs, making it an optional on-demand tool call introduces a stochastic point of failure. Universal rules should be compiled into system instructions or state; progressive disclosure should be reserved for conditional/situational knowledge.
+          </li>
+          <li>
+            <strong>Evaluate the Tool Call, Not Just the Output:</strong> Black-box response evaluation cannot detect when an agent gets lucky or bypasses architectural layers. Every tool that an agent is expected to invoke must have a corresponding tool-use rubric.
+          </li>
+          <li>
+            <strong>Watch for Cross-Agent Prompt Bleed:</strong> In multi-agent architectures, text returned from one agent (such as a memory retriever) is often inserted directly into prompts for subsequent agents. Without careful sanitization, retrieved historical context can actively override compliance instructions.
+          </li>
+        </ul>
+      </div>
+    </article>
+
+    <!-- Footer -->
+    <footer>
+      <div><a href="index.html">← Back to Overview</a> | <a href="lab-4.html">View Lab 4 Walkthrough →</a> | <a href="learnings.html">View Attendee Learnings Hub →</a></div>
+      <div>Maintained in <code>ai-devcamp-labs/docs/progressive-disclosure-and-skill-evals.html</code></div>
+    </footer>
+  </main>
+
+  <script src="lightbox.js"></script>
+  <script src="toc.js"></script>
+  <script>
+    (function () {
+      var KEY = "social-spark-theme";
+      var root = document.documentElement;
+      var btn = document.getElementById("themeToggle");
+      function showing() {
+        return root.dataset.theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      }
+      if (btn) {
+        btn.addEventListener("click", function () {
+          var next = showing() === "dark" ? "light" : "dark";
+          root.dataset.theme = next;
+          try { localStorage.setItem(KEY, next); } catch (e) {}
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
