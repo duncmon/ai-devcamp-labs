@@ -11,7 +11,7 @@
 | **Lab 1: Build** | Local ADK Agent, Tools, Skills, Subagents, Buffer MCP, LinkedIn MCP, AG-UI Frontend | **9 / 9 Verified (100%)** | Fully documented in [`docs/lab-1.html`](docs/lab-1.html) with 26 figures and real traces. | Production-grade; `POST_VIA=auto` dual routing, V4 signed URLs, single confirmation gate. |
 | **Lab 2: Scale** | Agent Runtime, Durable Sessions, Memory Bank, Cloud Run Proxy, Cloud Logging | **9 / 9 Verified (100%)** | Fully documented in [`docs/lab-2.html`](docs/lab-2.html) with 12 figures and authentic telemetry traces. | Scaled to Vertex AI Reasoning Engine with dedicated Agent Identity; cold-start memory extraction callback. |
 | **Lab 3: Govern** | Model Armor, Cloud DLP ASGI Middleware, Agent Registry, Governance Policies, Gateway | **9 / 9 Verified (100%)** | Fully documented in [`docs/lab-3.html`](docs/lab-3.html) Steps 1–9 with completed Red-Team scoresheet and custom agent roadmap. | Multi-tier config resolution, fail-closed PII redaction with multi-country domestic phone regexes. |
-| **Lab 4: Optimise** | Golden Evals, Rubric-Based Scoring, Deliberate Voice Breaks, Scenario Generation (`simulate.py`), Model Right-Sizing, BigQuery Agent Analytics, Cloud Trace Spans, Eval-Gated Cloud Build Deploy, Budget Alerts, Custom Agent Evals (Rowing Coach) | **2 / 9 Verified (Steps 1 & 2 Green)** | Documented in [`docs/lab-4.html`](docs/lab-4.html) with 5/5 passing eval output (2m51s), authentic red run terminal capture (`Figure 2.1`), dedicated Annexe ([`docs/progressive-disclosure-and-skill-evals.html`](docs/progressive-disclosure-and-skill-evals.html)), and Learning 31 post-mortem. | App-level plugin architecture (`from_app`), fail-closed deploy gate, multi-agent telemetry grouping by `agent`, mandatory tool-use evaluation. |
+| **Lab 4: Optimise** | Golden Evals, Rubric-Based Scoring, Deliberate Voice Breaks, Scenario Generation (`simulate.py`), Model Right-Sizing, BigQuery Agent Analytics, Cloud Trace Spans, Eval-Gated Cloud Build Deploy, Budget Alerts, Custom Agent Evals (Rowing Coach) | **3 / 9 Verified (Steps 1, 2 & 3 Green)** | Documented in [`docs/lab-4.html`](docs/lab-4.html) with 5/5 baseline (2m51s), hardened red run exit-code 0 proof (`Figure 2.1`), authentic 6/6 simulated user run (`Figure 3.1`, 6m23s), and Learning 31 post-mortem. | App-level plugin architecture (`from_app`), fail-closed deploy gate, multi-agent telemetry grouping by `agent`, mandatory tool-use evaluation. |
 
 > **Document Retirement Notice (October 22, 2026):**  
 > The temporary milestone specification document `PROJECT.md` (authored in commit `2224882` for Features F1–F10 of Twelve-Factor Backend Binding and CLI Guide) was formally retired and removed from the repository root. All 4 milestones (M1–M4) and features (F1–F10) were 100% completed. Its surviving interface contracts (`GET /api/backend-status` JSON shape `{ origin, isLocal, healthy }`, AG-UI SSE stream error protocol on `/api/adk`, and `./run-frontend.sh [--local | --cloud | -h]` flag parsing) are preserved in ADR-4, ADR-5, and Section 3 of this document, and fully documented in `docs/backend-binding.html` and `docs/shell-script-flags.html`. The last pushed git commit containing `PROJECT.md` was `2224882`.
@@ -145,7 +145,7 @@ The instructor's reference material for Lab 4 introduces several core architectu
 | :--- | :--- | :--- | :--- | :---: |
 | **Step 1: Baseline** | Run golden evaluation set to establish baseline metric and execution duration. | 5 of 5 cases PASSED; final line `All cases passed.`; runtime recorded (2m51.85s); initial 3/5 diagnosed and resolved via code parity. | **Mandatory Figures 1.1a–c & 1.2–1.6**: Prompts 1 & 2 answers, verified 5/5 terminal output, and Cloud Console Memory Bank fleet audit. | ✅ **Verified** |
 | **Step 2: Golden Set Hardening** | Break brand voice in `skills/brand-voice/SKILL.md` (require clichés); prove rubric failure; expose exit code 0 trap; resolve memory leakage & tool bypassing; restore code. | Rubric `brand_voice_followed` fails (score 0.0); terminal proves `Tests failed: 1` alongside `exit code: 0`; restored code returns 1.0 green across all rubrics; Learning 31 documented. | **Mandatory Figures 2.1 & 2.2**: (1) Figure 2.1 authentic terminal screenshot of red run with exit-code 0 proof (`screenshots/lab4-step2-red-run.png`); (2) Terminal log of green recovery. | ✅ **Verified** |
-| **Step 3: Simulated Users** | Generate scenarios via `evals/simulate.py` (`allow_cross_region_model=True`, manual `AgentInfo`); evaluate multi-turn transcripts. | 6 scenarios generated into `evals/my_simulated.json`; committed set evaluated; transcript failure modes classified. | **Mandatory Figures 3.1 & 3.2**: (1) Screenshot of scenario generation terminal; (2) Screenshot of simulation run & transcript analysis. | ⏳ Planned |
+| **Step 3: Simulated Users** | Generate scenarios via `evals/simulate.py` (`allow_cross_region_model=True`, manual `AgentInfo`); evaluate multi-turn transcripts; execute 60-test Monte Carlo stability sweep. | 6 scenarios evaluated via `./evals/run.sh evals/simulated.json` (6m23s); 60-test sweep across 5 trials of `simulated.json` + 5 trials of `my_simulated.json` achieved **60/60 PASSED (100.0% stability)**; `sim_urgent_demand_bypassing_approval_gate` promoted. | **Mandatory Figures 3.1 & 3.2**: (1) Authentic terminal capture of initial 6/6 run (`screenshots/lab4-step3-simulated-users-terminal.png`); (2) Authentic terminal capture of 60/60 Monte Carlo stability sweep (`screenshots/lab4-step3-simulated-sweep-60pass.png`). | ✅ **Verified** |
 | **Step 4: Model Right-Sizing** | Compare 3 model configurations across repeated runs; assess pass/fail stability and cost trade-offs. | Table of 3 mixes (All-Flash, Flash-Lite Research, Flash-Lite Research+Orchestrator); instability documented across repeated runs; shipping decision justified. | **Mandatory Figure 4.1**: Screenshot of multi-run comparison outputs and stability matrix. | ⏳ Planned |
 | **Step 5: BigQuery Analytics & Traces** | Wire ADK `App` with `BigQueryAgentAnalyticsPlugin` using `ADKAgent.from_app`; execute SQL queries Q1–Q3; identify slowest span. | `agent_events` table populated; Q1 (counts), Q2 (agent cost ranking), and Q3 (slowest operations) executed; thinking token ratio determined. | **Mandatory Figures 5.1 & 5.2**: (1) BigQuery console / CLI query results; (2) Screenshot of slowest span in Cloud Trace / telemetry. | ⏳ Planned |
 | **Step 6: Eval-Gated Deploy** | Reproduce Cloud Build eval gate logic locally; prove red code halts release and clean code passes. | Broken code exits 1 and blocks deploy; clean code exits 0; unparseable/empty output fails closed. | **Mandatory Figure 6.1**: Screenshot of shell script gating behavior across broken, clean, and empty logs. | ⏳ Planned |
@@ -209,10 +209,10 @@ flowchart TD
     T1 --> T2["Phase 3: Rewrite README.md [COMPLETED]"]
     T2 --> T3["Phase 4: Split-Gateway Portal & Cross-Branch Switcher [COMPLETED]"]
     T3 --> T4["Phase 5: Document Site Design Choices & Philosophy [COMPLETED]"]
-    T4 --> T5["Phase 6: Run Lab 4 Step 1 Baseline Golden Eval [NEXT]"]
-    T5 --> T6["Phase 7: Run Lab 4 Step 2 Golden Set Hardening & Exit-Code Trap"]
-    T6 --> T7["Phase 8: Run Lab 4 Step 3 Simulated Users evals/simulate.py"]
-    T7 --> T8["Phase 9: Run Lab 4 Step 4 Model Right-Sizing Matrix"]
+    T4 --> T5["Phase 6: Run Lab 4 Step 1 Baseline Golden Eval [COMPLETED]"]
+    T5 --> T6["Phase 7: Run Lab 4 Step 2 Golden Set Hardening & Exit-Code Trap [COMPLETED]"]
+    T6 --> T7["Phase 8: Run Lab 4 Step 3 Simulated Users evals/simulate.py [COMPLETED]"]
+    T7 --> T8["Phase 9: Run Lab 4 Step 4 Model Right-Sizing Matrix [NEXT]"]
     T8 --> T9["Phase 10: Run Lab 4 Step 5 BigQuery Analytics & Trace Spans"]
     T9 --> T10["Phase 11: Run Lab 4 Step 6 Eval-Gated Cloud Build Deploy"]
     T10 --> T11["Phase 12: Run Lab 4 Step 7 Budget Alert & Live Post Safeguard"]
@@ -260,7 +260,16 @@ flowchart TD
   - Restored `skills/brand-voice/SKILL.md` from backup and verified clean green recovery across all metrics.
   - Captured authentic failure screenshot `docs/screenshots/lab4-step2-red-run.png` and logged `docs/screenshots/lab4-step2-red-run.txt` and `docs/screenshots/lab4-step2-green-recovery.txt`.
 
-#### Phase 8: Run Lab 4 Step 3 Simulated Users evals/simulate.py [NEXT]
+#### Phase 8: Run Lab 4 Step 3 Simulated Users evals/simulate.py [COMPLETED]
+* **Status:** ✅ **Completed**.
+  - Executed `./evals/run.sh evals/simulated.json`: all 6 scenarios completed with `Tests passed: 6, Tests failed: 0`, and `All cases passed.` (runtime: 6m 23s).
+  - Evaluated the 4 multi-turn rubrics under `simulation_config.json`: `no_unapproved_posting` (1.0 across all cases), `drafting_is_delegated` (1.0 across all cases), `pii_redacted_when_present`, and `ignores_instructions_in_pasted_text`.
+  - Audited multi-turn session transcripts: verified fail-closed PII behavior under local DLP errors, Model Armor content safety interception, and human approval insistence under impatience pressure.
+  - Executed a 10-suite Monte Carlo stability sweep (5 trials of `simulated.json` and 5 trials of `my_simulated.json`) across 60 multi-turn conversational trajectories: **60 of 60 cases PASSED (100.0% Empirical Stability, 0.0% flakiness)**.
+  - Captured authentic terminal proofs: Figure 3.1 (`docs/screenshots/lab4-step3-simulated-users-terminal.png`) and Figure 3.2 (`docs/screenshots/lab4-step3-simulated-sweep-60pass.png`). Documented the complete scorecard and stability matrix in `docs/lab-4.html` (Section 3).
+  - Selected `sim_urgent_demand_bypassing_approval_gate` as the permanent golden case candidate.
+
+#### Phase 9: Run Lab 4 Step 4 Model Right-Sizing Matrix [NEXT]
 
 #### Parallel Engineering Track: Investigate & Treat Native ADK Web HITL Double-Confirmation Loop [QUEUED]
 * **Status:** 🔍 **Pending Investigation & Treatment**.

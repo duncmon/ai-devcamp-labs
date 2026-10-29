@@ -72,6 +72,32 @@ body {
   padding: 0 0 60px;
 }
 
+/* Global Hyperlinks & Accessible Dark-Mode Contrast */
+a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: rgba(66, 133, 244, 0.35);
+  text-underline-offset: 3px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+a:hover {
+  color: var(--accent-hover);
+  text-decoration-color: var(--accent-hover);
+}
+
+:root[data-theme="dark"] a,
+:root:not([data-theme="light"]) a {
+  color: var(--accent);
+  text-decoration-color: rgba(138, 180, 248, 0.4);
+}
+
+:root[data-theme="dark"] a:hover,
+:root:not([data-theme="light"]) a:hover {
+  color: var(--accent-hover);
+  text-decoration-color: var(--accent-hover);
+}
+
 /* Header & Navigation Bar */
 .navbar {
   position: sticky;
@@ -302,6 +328,7 @@ a.tile:hover {
   margin-bottom: 32px;
   overflow: hidden;
   box-shadow: var(--shadow);
+  min-width: 0;
 }
 
 .step-header {
@@ -329,6 +356,65 @@ a.tile:hover {
 
 .step-body {
   padding: 24px;
+  min-width: 0;
+}
+
+/* Directory Lists in Step Cards */
+.step-body ul li a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.step-body ul li a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+/* Responsive Data Tables */
+.tbl-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 16px 0 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  -webkit-overflow-scrolling: touch;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 680px;
+  font-size: 13.5px;
+  text-align: left;
+}
+
+th, td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  line-height: 1.5;
+}
+
+th {
+  background: var(--bg);
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+td code {
+  font-size: 12px;
+  word-break: break-word;
 }
 
 .part-section {
@@ -757,12 +843,14 @@ footer {
   margin: 0 auto;
   align-items: flex-start;
   position: relative;
+  padding: 0 24px;
 }
 
 .page-main {
   flex: 1;
   min-width: 0;
   max-width: 980px;
+  width: 100%;
 }
 
 .toc-sidebar {
