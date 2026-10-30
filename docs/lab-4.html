@@ -1183,7 +1183,7 @@ All cases passed.</code></pre>
         </p>
         <ul>
           <li>
-            <strong>The App vs. Agent Invariant (<code>ADKAgent.from_app</code>):</strong> ADK plugins bind to an <code>App</code> instance, <em>not</em> directly to an <code>Agent</code>. The legacy component constructor <code>ADKAgent(adk_agent=root_agent)</code> silently drops plugins with zero log output or errors. In <a href="backend/main.py"><code>backend/main.py</code></a>, we re-architected initialization to invoke <code>ADKAgent.from_app(adk_app, ...)</code> and updated the native <code>Runner(app=adk_app)</code> to guarantee event forwarding.
+            <strong>The App vs. Agent Invariant (<code>ADKAgent.from_app</code>):</strong> ADK plugins bind to an <code>App</code> instance, <em>not</em> directly to an <code>Agent</code>. The legacy component constructor <code>ADKAgent(adk_agent=root_agent)</code> silently drops plugins with zero log output or errors. In <code>backend/main.py</code>, we re-architected initialization to invoke <code>ADKAgent.from_app(adk_app, ...)</code> and updated the native <code>Runner(app=adk_app)</code> to guarantee event forwarding.
           </li>
           <li>
             <strong>Multi-Agent Telemetry Grouping by <code>agent</code>:</strong> When sub-agents (such as <code>draft_agent</code> and <code>research_agent</code>) execute via <code>AgentTool</code>, ADK spawns them in distinct isolated sessions with their own invocation and trace IDs. Consequently, grouping SQL queries by <code>session_id</code> silently omits sub-agent operations. All financial and operational SQL queries must group by the <code>agent</code> column.
@@ -1195,7 +1195,7 @@ All cases passed.</code></pre>
 
         <h3>2. Authentic Terminal Verification &amp; Table Population</h3>
         <p>
-          We created the parent dataset <code>agent_analytics</code> in the <code>US</code> region (<code>bq mk --location=US --dataset agent_analytics</code>), configured <code>BQ_ANALYTICS_DATASET=agent_analytics</code> in <a href="backend/social_poster/.env"><code>backend/social_poster/.env</code></a>, and executed a live turn via <code>evals/smoke_turn.py</code> with the prompt: <em>"Draft a short LinkedIn post about code review. No research, no image."</em>
+          We created the parent dataset <code>agent_analytics</code> in the <code>US</code> region (<code>bq mk --location=US --dataset agent_analytics</code>), configured <code>BQ_ANALYTICS_DATASET=agent_analytics</code> in <code>backend/social_poster/.env</code>, and executed a live turn via <code>evals/smoke_turn.py</code> with the prompt: <em>"Draft a short LinkedIn post about code review. No research, no image."</em>
         </p>
         <p>
           Inspecting <code>agent_events</code> confirmed that the plugin automatically initialized the schema, created the typed views, and streamed <strong>43 event records</strong> across 11 lifecycle categories:
@@ -1208,7 +1208,7 @@ All cases passed.</code></pre>
 
         <h3>3. Checkpoint Analytics Breakdown (Q1–Q6)</h3>
         <p>
-          Executing <a href="evals/analytics.py"><code>evals/analytics.py</code></a> against BigQuery evaluated the complete turn telemetry across our analytical queries:
+          Executing <code>evals/analytics.py</code> against BigQuery evaluated the complete turn telemetry across our analytical queries:
         </p>
 
         <h4>Q1 &amp; Q2: Token Allocation &amp; Agent Cost Ranking</h4>
@@ -1490,7 +1490,7 @@ BQ_ANALYTICS_LOCATION=US</code></pre>
       <div class="step-header">
         <div>
           <span class="step-num">Step 6 of 9</span>
-          <h2>Eval-Gated Cloud Build Deploy</h2>
+          <h2 class="step-title">Eval-Gated Cloud Build Deploy</h2>
         </div>
         <span class="badge green">100% Verified</span>
       </div>

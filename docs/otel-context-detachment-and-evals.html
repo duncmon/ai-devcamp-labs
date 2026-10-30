@@ -113,7 +113,7 @@ def detach(self, token: object) -> None:
       </div>
       <div class="step-body">
         <p>
-          We authored an empirical demonstration script (<a href="evals/prove_otel_detachment.py"><code>evals/prove_otel_detachment.py</code></a>) to simulate two sequential conversational turns on the same worker thread:
+          We authored an empirical demonstration script (<code>evals/prove_otel_detachment.py</code>) to simulate two sequential conversational turns on the same worker thread:
         </p>
         <ul>
           <li><strong>Turn 1:</strong> User <strong>Alice</strong> (Session <code>sess-alice-001</code>) requests: <em>"Draft a post about microservices"</em>.</li>
@@ -291,7 +291,7 @@ gcloud projects add-iam-policy-binding "$GOOGLE_CLOUD_PROJECT" \
         </figure>
 
         <p>
-          Re-running <a href="evals/analytics.py"><code>evals/analytics.py</code></a> confirmed that Q1–Q6 now aggregates both local and cloud turns seamlessly:
+          Re-running <code>evals/analytics.py</code> confirmed that Q1–Q6 now aggregates both local and cloud turns seamlessly:
         </p>
 
         <figure class="step-figure">

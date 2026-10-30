@@ -42,13 +42,13 @@
     <!-- Header -->
     <section class="hero">
       <div class="hero-meta">
-        <span class="badge blue">Labs 1, 2 &amp; 3 Post-Mortems</span>
+        <span class="badge blue">Labs 1–4 Post-Mortems (35 Insights)</span>
         <span class="badge yellow">Architectural Patterns</span>
         <span>Independent Attendee Discoveries</span>
       </div>
       <h1>Attendee Learnings, Anti-Patterns &amp; Production Solutions</h1>
       <p class="lead">
-        A complete, consolidated record of the engineering hurdles, architectural trade-offs, and critical anti-patterns discovered while building, scaling, and governing <strong>Social Spark</strong> across Labs 1 through 3.
+        A complete, consolidated record of the engineering hurdles, architectural trade-offs, and critical anti-patterns discovered while building, scaling, governing, and optimizing <strong>Social Spark</strong> across Labs 1 through 4.
       </p>
       <div class="callout warn">
         <strong>Important Distinction:</strong> This document captures our own independent learnings as attendees following in the lab instructors' footsteps. It is distinctly separate from the upstream instructor notes in <a href="https://sonikajanagill.com/ai-devcamp-labs/doc-viewer.html?src=LEARNINGS.md" target="_blank" rel="noopener"><code>LEARNINGS.md</code></a> (authored by Sonika Gill and the DevCamp core team). Rather than merely describing happy paths, this document analyzes where real-world systems fail, why certain implementations violate the Principle of Least Astonishment, and how to build resilient, fail-safe architectures.
@@ -114,6 +114,10 @@
               <li><a href="#issue-mock-model-404">29. Mock Memory Agent Regional Model 404 in Test Fixtures</a></li>
               <li><a href="#issue-substring-negative-constraint">30. Negative Constraint Collision &amp; Substring Interceptor Anti-Pattern</a></li>
               <li><a href="#issue-progressive-disclosure-blindspot">31. Memory Leakage &amp; Progressive Disclosure Blind Spot</a></li>
+              <li><a href="#issue-otel-context-detachment">32. OTel Context Detachment &amp; Franken-Traces in Online Evals</a></li>
+              <li><a href="#issue-deployed-bigquery-iam">33. Deployed Agent BigQuery Ingestion Gap: Missing IAM</a></li>
+              <li><a href="#issue-cicd-eval-gate">34. CI/CD Eval-Gate Anatomy &amp; Cloud Build Omissions</a></li>
+              <li><a href="#issue-linkedin-api-sunset">35. LinkedIn API Version Sunset &amp; Dual-Publisher Resilience</a></li>
             </ul>
           </div>
         </div>

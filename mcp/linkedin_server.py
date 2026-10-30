@@ -21,7 +21,9 @@ import httpx
 from fastmcp import FastMCP
 
 API_BASE = "https://api.linkedin.com"
-LINKEDIN_VERSION = "202506"  # Posts API versioned header, YYYYMM
+# LinkedIn Posts API versioned header (YYYYMM). Configurable via env var;
+# LinkedIn versions sunset after ~12 months, returning 426 Upgrade Required.
+LINKEDIN_VERSION = os.environ.get("LINKEDIN_VERSION", "202602")
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="[linkedin-mcp] %(message)s")
 log = logging.getLogger(__name__)
@@ -118,8 +120,28 @@ def create_post(text: str, image_path: str | None = None) -> dict:
             return {"status": "error", "error": str(e)}
         payload["content"] = {"media": {"id": image_urn, "altText": "Post illustration"}}
 
-    resp = httpx.post(f"{API_BASE}/rest/posts", headers=_headers(), json=payload, timeout=30)
-    resp.raise_for_status()
+    try:
+        resp = httpx.post(f"{API_BASE}/rest/posts", headers=_headers(), json=payload, timeout=30)
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        status_code = e.response.status_code
+        err_body = e.response.text
+        if status_code == 426:
+            log.error(
+                "LinkedIn API version %s expired (426 Upgrade Required). Update LINKEDIN_VERSION in .env. Response: %s",
+                LINKEDIN_VERSION,
+                err_body,
+            )
+            return {
+                "status": "error",
+                "error": f"LinkedIn API version {LINKEDIN_VERSION} expired (426 Upgrade Required). Set an active LINKEDIN_VERSION in .env.",
+            }
+        log.error("LinkedIn Posts API returned HTTP %s: %s", status_code, err_body)
+        return {"status": "error", "error": f"LinkedIn Posts API error (HTTP {status_code}): {err_body}"}
+    except Exception as e:
+        log.exception("Unexpected error calling LinkedIn Posts API")
+        return {"status": "error", "error": str(e)}
+
     post_urn = resp.headers.get("x-restli-id", "")
     ts = time.strftime("%Y-%m-%d %H:%M:%S")
     log.info("posted %s at %s", post_urn, ts)
