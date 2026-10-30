@@ -1499,20 +1499,48 @@ BQ_ANALYTICS_LOCATION=US</code></pre>
           Make evaluation the release gate. A change that breaks brand voice, PII redaction, or human approval gating must never reach users, regardless of how confident the author felt.
         </p>
 
-        <div class="callout warning">
-          <p><strong>The Upstream Curriculum Omission:</strong></p>
+        <h3>1. The Upstream Curriculum Walkthrough (The Vanilla Baseline)</h3>
+        <p>
+          In Step 6 of the official curriculum (<code>docs/instructor/lab-4-optimize.html</code>), the author introduces the core architectural concept of the evaluation release gate:
+        </p>
+        <div class="callout note">
+          <p><strong>The Instructor's Theory:</strong></p>
           <p>
-            In Step 6 of the official instructor guide (<code>docs/instructor/lab-4-optimize.html</code>), the author acknowledged: <em>"What we ran, and what we did not: We ran the gate's logic locally and watched it fail and pass. We did NOT run gcloud builds submit in this lab's preparation: it deploys a Cloud Run service, and the Cloud Run path is the optional route in this camp."</em>
+            The release pipeline defines two sequential steps in <code>cloudbuild.yaml</code>:
+          </p>
+          <ol>
+            <li><strong><code>eval-gate</code>:</strong> Installs dependencies with <code>uv</code>, starts the mock memory agent sidecar, runs the golden eval set with <code>adk eval</code>, and inspects the <code>"Tests failed: N"</code> line. It exits non-zero if $N > 0$ or if the line is unparseable (failing closed).</li>
+            <li><strong><code>deploy</code>:</strong> Runs only if the first step succeeds. Cloud Build stops at the first failing step, ensuring a regressed eval halts deployment before a new container revision is minted.</li>
+          </ol>
+          <p>
+            The instructor's prescribed exercise was to verify the shell parser logic locally: running the golden set with broken brand voice from Step 2, checking that the grep parser exits <code>1</code>, showing that clean code exits <code>0</code>, and testing an empty file to prove fail-closed defense.
           </p>
           <p>
-            Rather than stopping at a text simulation, we completed the full engineering journey: auditing the repository, diagnosing three upstream build defects that would have caused immediate failure, creating a dual-tier evaluation gate, and executing an authentic <strong>9m 12s Cloud Build pipeline</strong> to deploy Cloud Run service <code>social-poster</code> with status <code>SUCCESS</code>.
+            <strong>The Instructor's Deliberate Boundary:</strong> The author explicitly noted: <em>"We ran the gate's logic locally and watched it fail and pass. We did NOT run gcloud builds submit in this lab's preparation: it deploys a Cloud Run service, and the Cloud Run path is the optional route in this camp (the main path is Agent Runtime, Lab 2)."</em>
           </p>
         </div>
 
-        <h3>1. The Two-Tier Gate Architecture</h3>
+        <h4>Executing the Instructor's Local Parser Check</h4>
         <p>
-          Testing a bash function against pre-recorded static text logs is merely a unit test of a string parser. To achieve production rigor, we engineered a <strong>Dual-Tier Gate</strong>:
+          We began by reproducing the exact vanilla gating logic using <code>evals/verify_eval_gate.sh</code> across three scenarios (broken brand voice, clean golden set, and empty log):
         </p>
+
+        <figure class="step-figure">
+          <img src="screenshots/lab4-step6-verify-eval-gate-terminal.png" alt="Figure 6.1: Terminal output of verify_eval_gate.sh across broken, clean, and empty logs" class="lightbox-trigger">
+          <figcaption><strong>Figure 6.1:</strong> Authentic terminal verification executing <code>./evals/verify_eval_gate.sh</code>. Proves that intentional regressions exit <code>1</code> (deploy blocked), clean golden sets exit <code>0</code> (deploy permitted), and empty/unparseable outputs exit <code>1</code> (fail-closed invariant).</figcaption>
+        </figure>
+
+        <h3>2. The Engineering Pivot: Why We Expanded Beyond the Vanilla Scope</h3>
+        <p>
+          Testing a bash function against static text logs is merely a unit test of a string parser. In production engineering, a release gate is meaningless until it is proven against authentic deployments. Furthermore, our target agent had already been deployed to <strong>Vertex AI Reasoning Engine</strong> in Lab 2.
+        </p>
+        <p>
+          We therefore resolved to test the evaluation gate against <strong>both</strong> deployment targets:
+        </p>
+        <ol>
+          <li><strong>Agent Engine Release Gate:</strong> Authoring a reusable local live process gate (<code>evals/deploy_with_eval_gate.sh</code>) that executes live evaluations against Gemini 2.5 Flash before dispatching <code>agents-cli deploy --deployment-target agent_runtime</code> (or dry-run).</li>
+          <li><strong>Cloud Run Remote Cloud Build:</strong> Addressing the instructor's admitted gap by auditing <code>cloudbuild.yaml</code>, remediating upstream build blockers, and executing a real <code>gcloud builds submit</code> pipeline to Cloud Run.</li>
+        </ol>
 
         <div class="diagram-wrap">
           <svg viewBox="0 0 820 360" width="100%" height="auto" style="max-width: 820px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
@@ -1531,7 +1559,7 @@ BQ_ANALYTICS_LOCATION=US</code></pre>
             <!-- TIER 1 -->
             <rect x="20" y="20" width="370" height="320" rx="12" fill="var(--bg-panel, #f8f9fa)" stroke="#dadce0" stroke-width="1.5" />
             <text x="40" y="50" font-size="13.5" font-weight="700" fill="#1a73e8">TIER 1: Local Live Process-Level Gate</text>
-            <text x="40" y="68" font-size="11" fill="#5f6368">evals/deploy_with_eval_gate.sh</text>
+            <text x="40" y="68" font-size="11" fill="#5f6368">evals/deploy_with_eval_gate.sh (Agent Engine / Cloud Run)</text>
 
             <rect x="40" y="85" width="330" height="38" rx="6" fill="#fff" stroke="#1a73e8" stroke-width="1.5"/>
             <text x="55" y="109" font-size="11.5" font-weight="600" fill="#202124">1. Spawn Background Mock Sidecar (:8001)</text>
@@ -1587,9 +1615,9 @@ BQ_ANALYTICS_LOCATION=US</code></pre>
           </svg>
         </div>
 
-        <h3>2. Uncovering &amp; Remediating the Three Upstream Deficiencies</h3>
+        <h3>3. Uncovering &amp; Remediating the Three Upstream Deficiencies</h3>
         <p>
-          Before a build could execute in Google Cloud Build, three blockers had to be identified and eliminated:
+          When auditing why the upstream authors never executed <code>gcloud builds submit</code>, three fatal deficiencies were discovered in the repo:
         </p>
         <div class="table-wrap">
           <table>
@@ -1624,17 +1652,7 @@ BQ_ANALYTICS_LOCATION=US</code></pre>
           </table>
         </div>
 
-        <h3>3. Tier 1: Local Regex &amp; Live Process Verification</h3>
-        <p>
-          We proved that the zero-exit trap cannot bypass our gate using <code>evals/verify_eval_gate.sh</code> across three scenarios:
-        </p>
-
-        <figure class="step-figure">
-          <img src="screenshots/lab4-step6-verify-eval-gate-terminal.png" alt="Figure 6.1: Terminal output of verify_eval_gate.sh across broken, clean, and empty logs" class="lightbox-trigger">
-          <figcaption><strong>Figure 6.1:</strong> Authentic terminal verification executing <code>./evals/verify_eval_gate.sh</code>. Proves that intentional regressions exit <code>1</code> (deploy blocked), clean golden sets exit <code>0</code> (deploy permitted), and empty/unparseable outputs exit <code>1</code> (fail-closed invariant).</figcaption>
-        </figure>
-
-        <h4>Live Process Gate Execution</h4>
+        <h3>4. Tier 1: Local Live Process-Level Gate (Agent Engine &amp; Cloud Run Target)</h3>
         <p>
           Next, we executed the live process gate script (<code>./evals/deploy_with_eval_gate.sh evals/golden.json:on_brand_draft dry-run</code>), verifying sidecar startup, real-time Gemini evaluation, and deployment gate dispatch:
         </p>
@@ -1666,7 +1684,7 @@ Pipeline succeeded.
 Cleaning up mock memory agent sidecar (PID 6765)...</code></pre>
         </div>
 
-        <h3>4. Tier 2: Cloud-Native Google Cloud Build Execution</h3>
+        <h3>5. Tier 2: Cloud-Native Google Cloud Build &amp; Cloud Run Execution</h3>
         <p>
           With prerequisites provisioned via <code>evals/setup_cloudbuild_prereqs.sh</code>, we submitted the pipeline directly to Google Cloud Build:
         </p>
@@ -1724,7 +1742,7 @@ ID: 24071fdb-7747-48bf-af72-9db35dbf0c23  DURATION: 9M12S  STATUS: SUCCESS</code
           </p>
         </div>
 
-        <h3>5. Verifying the Live Deployed Cloud Run Service</h3>
+        <h3>6. Operational Verification &amp; Session Visibility Analysis</h3>
         <p>
           To eliminate all ambiguity between build logs and operational reality, we validated the deployed service across three authentic verification vectors:
         </p>
