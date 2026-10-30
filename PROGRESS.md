@@ -374,6 +374,9 @@ flowchart TD
      - Write plain-English rubrics in `evals/eval_config.json`.
      - Intentionally break behavior (e.g. prescribe unsafe training or bypass confirmation), run eval, and prove rubric failure alongside the `Tests failed: 1` exit-code trap.
      - Restore code and verify 100% green passing report.
+  4. **Track 4: Complete Documentation Accompaniment & Architectural Rigor:**
+     - Replicate the complete documentation architecture from the Social Spark project (`docs/` static HTML suite / GitHub Pages).
+     - Author a standalone, publication-grade write-up recording system architecture, periodization and biomechanical domain logic, Architectural Decision Records (ADRs), empirical bugs encountered, and production resolutions, backed by authentic terminal figures, traces, and UI captures.
 
 #### Parallel Engineering Track: Investigate & Treat Native ADK Web HITL Double-Confirmation Loop [QUEUED]
 * **Status:** 🔍 **Pending Investigation & Treatment**.
