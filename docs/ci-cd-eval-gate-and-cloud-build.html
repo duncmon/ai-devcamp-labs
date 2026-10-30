@@ -315,9 +315,30 @@ echo "Golden evalset passed clean."</code></pre>
       <div class="step-header">
         <div>
           <span class="step-num">Part 5</span>
-          <h2>Permanent Engineering Recommendations</h2>
+          <h2>Permanent Engineering Recommendations &amp; Direnv Context Isolation</h2>
         </div>
         <span class="badge green">Best Practices</span>
+      </div>
+
+      <div class="callout note" style="margin-bottom: 20px;">
+        <p><strong>Why <code>direnv</code> is Essential in Enterprise GCP Workstations:</strong></p>
+        <p>
+          In enterprise Google Cloud development, engineers frequently juggle multiple active projects (e.g., personal development sandboxes, devcamp environments like <code>ai-devcamp-duncan-395792</code>, and production systems). Without automation, developers must manually run <code>gcloud config set project</code> or remember to export variables on every terminal tab switch. A single missed export can cause catastrophic context-bleeding—such as provisioning test compute against a production billing account.
+        </p>
+        <p>
+          <strong>The Role of <code>direnv</code>:</strong> By placing an <code>.envrc</code> file at the project root containing:
+        </p>
+        <pre><code>export CLOUDSDK_ACTIVE_CONFIG_NAME="ai-devcamp"
+export GOOGLE_CLOUD_PROJECT="ai-devcamp-duncan-395792"</code></pre>
+        <p>
+          the developer's interactive shell automatically activates the isolated gcloud profile and project context upon entering the workspace and unloads them upon leaving.
+        </p>
+        <p>
+          <strong>Why <code>.envrc</code> Must Be in <code>.gcloudignore</code>:</strong> Because <code>.envrc</code> is purely local workstation configuration (which may also contain developer-specific secrets and profile references), it must NEVER be uploaded to Google Cloud Build or containerized into Cloud Run images. Adding <code>.envrc</code> and <code>*.envrc</code> to <code>.gcloudignore</code> is a mandatory enterprise security rule.
+        </p>
+        <p>
+          <strong>The Subshell Invariant:</strong> Automated agents and CI runner subshells do not automatically evaluate directory hooks; therefore, provisioning scripts and commands must explicitly source <code>.envrc</code> or export these variables to prevent fallback to unintended default configurations.
+        </p>
       </div>
 
       <ol>
@@ -328,6 +349,7 @@ PROJECT_NUM=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumb
 CB_SA="${PROJECT_NUM}@cloudbuild.gserviceaccount.com"</code></pre>
         </li>
         <li><strong>Decoupled Gating Scripts:</strong> Separate the gating logic from Cloud Build specifics so local developers can run <code>./evals/deploy_with_eval_gate.sh</code> pre-commit before triggering expensive remote builds.</li>
+        <li><strong>Visual Console Proofs vs. Raw Logs:</strong> While raw CLI build logs (such as <code>docs/screenshots/lab4-step6-cloudbuild-success.txt</code>) verify command execution, production documentation requires visual UI screenshots from Google Cloud Console (Cloud Run dashboard and Cloud Build history) to prove live endpoint health and traffic allocation without ambiguity.</li>
       </ol>
     </article>
   </main>

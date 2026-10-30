@@ -1710,10 +1710,20 @@ DONE
 ID: 24071fdb-7747-48bf-af72-9db35dbf0c23  DURATION: 9M12S  STATUS: SUCCESS</code></pre>
         </div>
 
+        <div class="callout note" style="margin-top: 16px;">
+          <p><strong>Multi-Project Isolation with <code>direnv</code>:</strong></p>
+          <p>
+            The developer uses <code>direnv</code> with a root <code>.envrc</code> to isolate the active Google Cloud configuration (<code>CLOUDSDK_ACTIVE_CONFIG_NAME="ai-devcamp"</code> and <code>GOOGLE_CLOUD_PROJECT="ai-devcamp-duncan-395792"</code>). This prevents catastrophic project bleeding across multiple customer or production workspaces. Because <code>.envrc</code> represents local developer workstation plumbing and could leak secrets, it is permanently added to <code>.gcloudignore</code>.
+          </p>
+        </div>
+
         <div class="callout check">
           <p><strong>Checkpoint Verification — Step 6 Complete:</strong></p>
           <p>
-            The evaluation-gated deployment pipeline is 100% verified across both local and cloud layers. When code is regressed, the gate exits <code>1</code> and blocks deployment. When code is clean, the gate exits <code>0</code> and allows Cloud Build to build and deploy Cloud Run revision <code>social-poster-00001-krq</code>. Unparseable and empty output fails closed.
+            The evaluation-gated deployment pipeline is verified across both local and cloud layers. When code is regressed, the gate exits <code>1</code> and blocks deployment. When code is clean, the gate exits <code>0</code> and allows Cloud Build to build and deploy Cloud Run revision <code>social-poster-00001-krq</code>. Unparseable and empty output fails closed.
+          </p>
+          <p>
+            <em>Note on Visual Evidence:</em> While the remote execution log (Build ID <code>24071fdb-7747-48bf-af72-9db35dbf0c23</code>) proves Cloud Run revision <code>social-poster-00001-krq</code> deployed successfully, a visual UI screenshot of the Cloud Run service console / live endpoint curl will be captured to complement the log archive.
           </p>
         </div>
 
