@@ -1352,6 +1352,34 @@ if key and key.lower() not in ("none", "unset", "use_secret", "secret_manager", 
       </div>
     </article>
 
+    <!-- ISSUE 35: PILLAR 4 - LINKEDIN API VERSION SUNSET & DUAL-PUBLISHER RESILIENCE -->
+    <article class="step-card" id="issue-linkedin-api-sunset">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Learning 35 · Pillar 4 (Optimise)</span>
+          <h2 class="step-title">LinkedIn API Version Sunset (HTTP 426 Upgrade Required) &amp; Dual-Publisher Resilience (ADR-1)</h2>
+        </div>
+      </div>
+      <div class="step-body">
+        <p>
+          <strong>The Context:</strong> In Step 7, we unlocked the deliberate external publication exception by setting <code>DRY_RUN=false</code> and <code>BUFFER_REVIEW_DELAY_MINUTES=0</code> to publish a live test post to LinkedIn for the fictive test entity <em>The Dry Testing Company</em>.
+        </p>
+        <p>
+          <strong>The Empirical Symptom:</strong> When the orchestrator invoked the direct LinkedIn MCP tool (<code>linkedin_create_post</code>), LinkedIn's server returned:
+        </p>
+        <pre><code>HTTPStatusError: Client error '426 Upgrade Required' for url 'https://api.linkedin.com/rest/posts'</code></pre>
+        <p>
+          <strong>The Root Cause:</strong> In <code>mcp/linkedin_server.py</code>, the header <code>LinkedIn-Version: 202506</code> pins a version that LinkedIn has sunsetted/deprecated. LinkedIn's REST Posts API enforces strict version currency, rejecting expired version headers with HTTP status <code>426 Upgrade Required</code>.
+        </p>
+        <p>
+          <strong>The Dual-Publisher Resilience (ADR-1 in Action):</strong> Instead of failing the entire user turn, the architecture's dual-publisher routing (established in ADR-1) proved its defensive value. The agent gracefully detected the error, fell back to the remote Buffer MCP publisher (<code>create_post</code>), and dispatched the approved draft through Buffer's connected LinkedIn channel (<code>6abe6ba6ea19ca0bde43ee9d</code>).
+        </p>
+        <p>
+          <strong>The Live Verification:</strong> Buffer reported <code>status=sent, shareMode=shareNow</code>, publishing immediately to LinkedIn at <a href="https://www.linkedin.com/feed/update/urn:li:share:7521884055882158080" target="_blank" rel="noopener"><code>urn:li:share:7521884055882158080</code></a>. Both safety nets (<code>DRY_RUN=true</code> and <code>BUFFER_REVIEW_DELAY_MINUTES=60</code>) were restored immediately following the post.
+        </p>
+      </div>
+    </article>
+
     <!-- Footer -->
     <footer>
       <div><a href="index.html">← Back to Overview</a> | <a href="lab-4.html">View Lab 4 Walkthrough →</a></div>

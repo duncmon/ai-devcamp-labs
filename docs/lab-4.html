@@ -1838,6 +1838,87 @@ ID: 24071fdb-7747-48bf-af72-9db35dbf0c23  DURATION: 9M12S  STATUS: SUCCESS</code
         </p>
       </div>
     </article>
+
+    <!-- ==========================================
+         STEP 7: BUDGET ALERT & ONE REAL POST
+         ========================================== -->
+    <article class="step-card" id="step-7">
+      <div class="step-header">
+        <div>
+          <span class="step-num">Step 7 of 9</span>
+          <h2 class="step-title">A Budget Alert &amp; One Real Post (The Planned Live Exception)</h2>
+        </div>
+        <span class="badge green">Live Verified</span>
+      </div>
+      <div class="step-body">
+        <p class="lede">
+          Two last guardrails on financial governance and external dispatch, followed by the single planned exception to every safety net built across the four pillars.
+        </p>
+
+        <h3>1. The Budget Alert (Financial Guardrail)</h3>
+        <p>
+          A budget alert does not hard-stop API calls; it alerts billing administrators when spend approaches operational thresholds, preventing runaway agent loops from remaining hidden until monthly invoice day.
+        </p>
+        <p>
+          Because budgets belong to the <strong>billing account</strong> (which is shared across multiple projects on this account), the budget was created via <code>gcloud billing budgets create</code> with strict project scoping:
+        </p>
+        <ul>
+          <li><strong>Billing Account ID:</strong> <code>0111F8-093A52-2B0764</code></li>
+          <li><strong>Project Scope:</strong> Filtered strictly to <code>projects/498585195540</code> (<code>ai-devcamp-duncan-395792</code> only).</li>
+          <li><strong>Target Amount:</strong> <strong>$75 USD</strong> (Monthly recurring calendar period).</li>
+          <li><strong>Gross Spend Tracking:</strong> Configured with <code>creditTypesTreatment: EXCLUDE_ALL_CREDITS</code> in Google Cloud Console, guaranteeing spend is tracked before promotional credits, trial grants, or discounts are applied.</li>
+          <li><strong>Threshold Triggers:</strong> 50% ($37.50), 90% ($67.50), and 100% ($75.00) of actual current spend.</li>
+        </ul>
+
+        <div class="code-block">
+          <div class="code-head"><span>gcloud billing budgets create (Verified Specification)</span></div>
+          <pre><code>$ CLOUDSDK_ACTIVE_CONFIG_NAME="ai-devcamp" gcloud billing budgets create \
+  --billing-account="0111F8-093A52-2B0764" \
+  --display-name='social-spark $75' \
+  --budget-amount="75USD" \
+  --calendar-period=month \
+  --filter-projects="projects/ai-devcamp-duncan-395792" \
+  --threshold-rule=percent=0.5 \
+  --threshold-rule=percent=0.9 \
+  --threshold-rule=percent=1.0</code></pre>
+        </div>
+
+        <h3>2. The One Real Post (The Deliberate Exception)</h3>
+        <div class="callout warn">
+          <p><strong>The One Deliberate Exception:</strong> Throughout all previous labs, all publishing tools defaulted to safe containment: <code>DRY_RUN=true</code> on LinkedIn, and <code>BUFFER_REVIEW_DELAY_MINUTES=60</code> on Buffer. For this verification, both settings were flipped visibly and on purpose (<code>DRY_RUN=false</code> and <code>BUFFER_REVIEW_DELAY_MINUTES=0</code>) to publish one real post to a dedicated testing channel, and restored in the same sitting.</p>
+        </div>
+
+        <h4>Execution &amp; Dual-Publisher Resilience</h4>
+        <p>
+          The live test was executed through the interactive CopilotKit web frontend on <code>http://localhost:3000</code> targeting the fictive test entity <em>The Dry Testing Company</em>:
+        </p>
+        <ol>
+          <li><strong>Human-in-the-Loop Approval:</strong> The orchestrator generated the draft post celebrating 10,000 dry test samples with zero hype words and paused at <code>pipeline_stage: awaiting_approval</code>. The human reviewer inspected and approved the exact draft card.</li>
+          <li><strong>Direct LinkedIn Version Expiration (HTTP 426):</strong> When the agent dispatched <code>linkedin_create_post</code>, LinkedIn's API returned <code>426 Upgrade Required</code> due to the deprecated version header <code>202506</code> (<a href="learnings.html#issue-linkedin-api-sunset">Learning 35</a>).</li>
+          <li><strong>Graceful Fallback to Buffer (ADR-1):</strong> The orchestrator fell back to the Buffer MCP toolset (<code>create_post</code>), targeting channel <code>6abe6ba6ea19ca0bde43ee9d</code>. Buffer immediately published the update with <code>shareMode: shareNow</code> and <code>status: sent</code>.</li>
+        </ol>
+
+        <figure class="step-figure">
+          <img src="screenshots/lab4-step7-buffer-sent-proof.png" alt="Figure 7.1: Buffer Sent Dashboard showing completed post dispatch for DryTesting Company" class="lightbox-trigger">
+          <figcaption><strong>Figure 7.1:</strong> Buffer web dashboard (<code>publish.buffer.com/channels/.../schedule?tab=sent</code>) confirming the live post was dispatched to <em>DryTesting Company</em> via channel <code>6abe6ba6ea19ca0bde43ee9d</code> at 11:41 AM (<code>status: sent</code>, <code>shareMode: shareNow</code>).</figcaption>
+        </figure>
+
+        <figure class="step-figure">
+          <img src="screenshots/lab4-step7-linkedin-live-post-proof.png" alt="Figure 7.2: LinkedIn live post feed showing the published DryTesting Company post" class="lightbox-trigger">
+          <figcaption><strong>Figure 7.2:</strong> Authentic LinkedIn live post feed verifying publication for <em>DryTesting Company</em> at <a href="https://www.linkedin.com/feed/update/urn:li:share:7521884055882158080" target="_blank" rel="noopener"><code>https://www.linkedin.com/feed/update/urn:li:share:7521884055882158080</code></a>. Shows post copy, proper hashtags, and zero corporate hype clichés.</figcaption>
+        </figure>
+
+        <h4>Immediate Safety Restoration</h4>
+        <p>
+          Immediately following publication, the safety nets were restored to their default containment state in <code>backend/social_poster/.env</code>:
+        </p>
+        <div class="code-block">
+          <div class="code-head"><span>backend/social_poster/.env (Restored Production Settings)</span></div>
+          <pre><code>DRY_RUN=true
+BUFFER_REVIEW_DELAY_MINUTES=60</code></pre>
+        </div>
+      </div>
+    </article>
   </main>
 
   <!-- Footer -->
