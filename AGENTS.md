@@ -43,6 +43,13 @@ uv run adk web backend    # chat + trace inspector, no frontend needed
 - Any tool with a real side effect (posting) is gated with
   `require_confirmation=True` — don't rely on instruction text alone for
   approval.
+- Fail-Closed CI/CD Release Gating: Never rely on raw CLI exit codes (`$?`) from
+  evaluation tools (e.g. `adk eval`, which exits 0 on failure). CI gates and
+  `cloudbuild.yaml` must parse test counters explicitly and abort (`exit 1`) if
+  failures > 0 or if the log output is missing/unparseable.
+- Cloud Build Packaging & IAM: Ensure `evals/` is included in `.gcloudignore` for
+  eval-gated builds while `.envrc` and local secrets are excluded. Grant
+  `roles/aiplatform.user` to the Cloud Build service account.
 - Keep an MCP toolset's `tool_filter` scoped to exactly what's used, not
   "everything except X". A large, schema-varied toolset (a remote MCP
   server's full tool list, say) can break structured function-calling on
