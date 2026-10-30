@@ -1772,6 +1772,27 @@ ID: 24071fdb-7747-48bf-af72-9db35dbf0c23  DURATION: 9M12S  STATUS: SUCCESS</code
           <figcaption><strong>Figure 6.5:</strong> Google Cloud Run Logs Explorer trace showing container startup, Model Armor initialization (<code>Model Armor is on: streaming disabled</code>), uvicorn listening on port 8080, and authenticated request routing.</figcaption>
         </figure>
 
+        <figure class="step-figure">
+          <img src="screenshots/lab4-step6-cloudrun-live-curl-terminal.png" alt="Figure 6.6: Terminal execution of live curl against POST /stream_reasoning_engine" class="lightbox-trigger">
+          <figcaption><strong>Figure 6.6:</strong> Authentic terminal capture executing live authenticated curl against <code>https://social-poster-5d62tedtba-uc.a.run.app/stream_reasoning_engine</code>. Shows real-time multi-agent reasoning, sub-agent delegation, and safe halting at <code>pipeline_stage: awaiting_approval</code>.</figcaption>
+        </figure>
+
+        <figure class="step-figure">
+          <img src="screenshots/lab4-step6-cloudrun-logs-model-invocations.png" alt="Figure 6.7: Cloud Run Logs Explorer showing detailed model requests, tokens, and MCP processing" class="lightbox-trigger">
+          <figcaption><strong>Figure 6.7:</strong> Cloud Run Logs Explorer showing live container telemetry during the request: <code>[linkedin-mcp] Processing request of type ListToolsRequest</code>, repeated <code>Sending out request, model: gemini-2.5-flash</code> calls, and <code>Response received from the model</code> (HTTP 200, 17.838s latency, 8.21 KiB payload).</figcaption>
+        </figure>
+
+        <div class="callout tip" style="margin-top: 20px;">
+          <p><strong>Architectural Insight: Agent Engine vs. Cloud Run Session Visibility</strong></p>
+          <p>
+            An essential operational trade-off highlighted by this live test:
+          </p>
+          <ul>
+            <li><strong>Vertex AI Reasoning Engine:</strong> Out of the box, provides dedicated session inspection tabs, native durable session APIs (<code>VertexAiSessionService</code>), built-in Memory Bank RAG search, and integrated test playground UIs without custom code.</li>
+            <li><strong>Google Cloud Run:</strong> Provides superior standard container portability, arbitrary system binary dependencies, custom networking, and granular autoscaling down to zero. However, <em>session visibility is not native</em>—all agent operations appear as raw stdout/stderr logs in Google Cloud Logging (Figure 6.7) unless explicitly bridged to BigQuery Agent Analytics or Cloud Trace spans.</li>
+          </ul>
+        </div>
+
         <h4>Live Multi-Turn Agent Stream on Cloud Run</h4>
         <p>
           The live curl invocation against <code>POST /stream_reasoning_engine</code> executed successfully on the Cloud Run container:
