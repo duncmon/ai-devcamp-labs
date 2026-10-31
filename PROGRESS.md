@@ -623,5 +623,39 @@ flowchart TD
      - **Cloud Run Endpoint:** Deployed revision `rowing-coach-demo-00007-mbj` serving 100% of traffic with `DEMO_PASSCODE=rowing-XPeHYSfY-devcamp-2026`.
      - **Permanent URL:** `https://rowing-coach-demo-498585195540.us-central1.run.app/?code=rowing-XPeHYSfY-devcamp-2026`.
 
+---
+
+#### Phase 20: Deterministic Code-Level PII Sanitization via ADK Callbacks (Zero LLM Dependency Invariant) [COMPLETED & VERIFIED]
+* **Target Repositories:**
+  - `/Users/duncanmoncrieff/projects/gdg-london-ai-devcamp-sept26/AI-Devcamp-rowing-coach-agent/` (Branch: `main`)
+* **Reference Commit:** `0593597`.
+* **Architectural Directive & Core Engineering Principle (Social Spark Alignment):**
+  - Prompt instructions and negative constraints (`NEVER write '(Coach David)'`) are non-deterministic and can be intermittently ignored by LLMs during complex multi-step reasoning.
+  - Following the architectural lesson from the instructor's Social Spark project (pure-ASGI middleware and deterministic boundary interception), **privacy invariants must be enforced deterministically in Python code**, never relying on the model's good behavior.
+* **Deterministic Multi-Layer Defense Implemented:**
+  1. **ADK `after_model_callback` (`friendly_block` in `rowing_coach/guardrails.py`):**
+     - Intercepts every `LlmResponse` immediately after model generation before any tool dispatch or user emission.
+     - **Function Call Argument Sanitization:** Recursively scans `part.function_call.args`; maps any cleartext athlete IDs, names, or coach aliases (e.g. `david_montgamery`, `David Montgamery`, `Coach David`) to their cryptographic tokens (`[ATHLETE_ath_5a77195e]`).
+     - **Text Output Sanitization:** Deterministically strips parenthetical cleartext explanations (e.g. `[ATHLETE_ath_5a77195e] (Coach David)` $\to$ `[ATHLETE_ath_5a77195e]`), replaces known squad names with their corresponding tokens, and collapses nested or consecutive duplicate tokens.
+     - Returns the sanitized `LlmResponse` so altered events replace raw model output in both runtime execution and Cloud Logging telemetry.
+  2. **ADK `before_tool_callback` (`_sanitize_tool_args` in `rowing_coach/agent.py`):**
+     - Intercepts tool calls at the tool boundary prior to execution, mutating arguments in-place so custom tools and MCP servers receive 100% tokenized inputs.
+  3. **Tool Signature & Schema Cleansing (`rowing_coach/tools.py`):**
+     - Updated default keys in `generate_coach_notes` from raw names (`david_montgamery`) to pseudonym tokens (`[ATHLETE_ath_5a77195e]`), preventing Gemini from inspecting tool schemas with cleartext keys.
+  4. **Cloud Run Proxy Defense-in-Depth (`local_proxy.py`):**
+     - Sanitizes `function_call.args` and streaming `text` deltas during SSE dispatch to prevent raw names from reaching the web client prior to client-side Gate 2 rehydration.
+* **Automated Regression Suite (`tests/test_guardrails.py` & `tests/test_regression_fixes.py`):**
+  - Added `test_deterministic_sanitizer_function_call_args` verifying `athlete_id="david_montgamery"` is rewritten to `[ATHLETE_ath_5a77195e]`.
+  - Added `test_deterministic_sanitizer_parenthetical_cleartext_text` verifying `(Coach David)` is stripped from model text.
+  - Added `test_deterministic_sanitizer_squad_names_in_text` verifying squad names are mapped to tokens.
+  - Added `test_agent_before_tool_callback_sanitizes_args` verifying `_sanitize_tool_args`.
+  - Added `test_issue5_deterministic_code_pii_sanitization_zero_llm_dependency` simulating the exact Vertex AI Playground failure trace.
+  - Full suite status: **114 / 114 tests passing GREEN (100%) in 2.11s** via `uv run pytest`.
+* **Cloud Deployments Active & Verified:**
+  - **Vertex AI Reasoning Engine:** Deployed via `agents-cli deploy` (ID: `5062846700507365376`, Operation `2386560404076625920`).
+  - **Cloud Run Proxy:** Deployed revision `rowing-coach-demo-00008-vxs` serving 100% of traffic with `DEMO_PASSCODE=rowing-XPeHYSfY-devcamp-2026`.
+  - **Verified Live Endpoint:** `https://rowing-coach-demo-498585195540.us-central1.run.app/?code=rowing-XPeHYSfY-devcamp-2026` returns `HTTP 200` with executive dashboard and valid session cookie.
+
+
 
 
