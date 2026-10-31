@@ -11,8 +11,8 @@ Built during the **GDG London Agentic DevCamp 2026** using the **Google Cloud Ag
 This repository maintains a strict architectural distinction between the upstream workshop curriculum and our empirical implementation portfolio:
 
 * **[Duncan's Walkthrough Portfolio & Engineering Analysis](https://duncmon.github.io/ai-devcamp-labs/) (`docs/`)**:  
-  Published as our live GitHub Pages documentation. Contains step-by-step walkthroughs, **7 Architectural Decision Records (ADRs)**, **27+ empirical engineering post-mortems**, 87+ authentic verification screenshots, and dedicated educational guides (e.g. Twelve-Factor Backend Binding and Shell Script CLI Flag Parsing).
-* **[Upstream Instructor Curriculum](docs/instructor/index.html) (`docs/instructor/`)**:  
+  Published as our live GitHub Pages documentation. Contains step-by-step walkthroughs, **8 Architectural Decision Records (ADRs)**, **35 empirical engineering post-mortems**, 117+ authentic verification screenshots, and 8 dedicated architectural deep-dives (such as CI/CD Eval-Gated Cloud Build, OTel Context Detachment & Franken-Traces, Twelve-Factor Backend Binding, and Progressive Disclosure Skill Invariants).
+* **[Upstream Instructor Curriculum](https://duncmon.github.io/ai-devcamp-labs/instructor/) (`docs/instructor/`)**:  
   Authored by **Sonika Janagill** for GDG London. Preserves the original workshop codelabs, setup guides, and demonstration scripts (hosted upstream at [sonikajanagill.com/ai-devcamp-labs](https://sonikajanagill.com/ai-devcamp-labs/)).
 
 ---
@@ -35,10 +35,10 @@ This repository maintains a strict architectural distinction between the upstrea
 
 | Pillar & Lab | Upstream Lab Guide | Duncan's Walkthrough & Proof | Verified Checkpoints & Architectural Invariants |
 | :--- | :--- | :--- | :--- |
-| **Pillar 1: Build** | [`docs/instructor/lab-1-build.html`](docs/instructor/lab-1-build.html) | [**Lab 1 Walkthrough**](docs/lab-1.html) | **9 / 9 Verified (26 Figures)**. Dual-publisher routing (`POST_VIA=auto`, ADR-1), V4 signed URLs (ADR-2), in-flight stepper sync (ADR-5). |
-| **Pillar 2: Scale** | [`docs/instructor/lab-2-scale.html`](docs/instructor/lab-2-scale.html) | [**Lab 2 Walkthrough**](docs/lab-2.html) | **9 / 9 Verified (12 Figures)**. Vertex AI Reasoning Engine deployment, cryptographic Agent Identity, scale-to-zero memory callback (ADR-7). |
-| **Pillar 3: Govern** | [`docs/instructor/lab-3-govern.html`](docs/instructor/lab-3-govern.html) | [**Lab 3 Walkthrough**](docs/lab-3.html) | **9 / 9 Verified (8 Figures)**. Model Armor regional templates, pure-ASGI DLP domestic phone redaction (ADR-3), Agent Registry, 8/8 Red-Team block. |
-| **Pillar 4: Optimise** | [`docs/instructor/lab-4-optimize.html`](docs/instructor/lab-4-optimize.html) | [**Lab 4 Roadmap**](docs/index.html) | **Active in `PROGRESS.md`**. Golden eval set hardening, simulated users (`simulate.py`), BigQuery Agent Analytics, Cloud Build eval gate. |
+| **Pillar 1: Build** | [`Build Guide ↗`](https://duncmon.github.io/ai-devcamp-labs/instructor/lab-1-build.html) | [**Lab 1 Walkthrough ↗**](https://duncmon.github.io/ai-devcamp-labs/lab-1.html) | **9 / 9 Verified (26 Figures)**. Dual-publisher routing (`POST_VIA=auto`, ADR-1), V4 signed URLs (ADR-2), in-flight stepper sync (ADR-5). |
+| **Pillar 2: Scale** | [`Scale Guide ↗`](https://duncmon.github.io/ai-devcamp-labs/instructor/lab-2-scale.html) | [**Lab 2 Walkthrough ↗**](https://duncmon.github.io/ai-devcamp-labs/lab-2.html) | **9 / 9 Verified (12 Figures)**. Vertex AI Reasoning Engine deployment, cryptographic Agent Identity, scale-to-zero memory callback (ADR-7). |
+| **Pillar 3: Govern** | [`Govern Guide ↗`](https://duncmon.github.io/ai-devcamp-labs/instructor/lab-3-govern.html) | [**Lab 3 Walkthrough ↗**](https://duncmon.github.io/ai-devcamp-labs/lab-3.html) | **9 / 9 Verified (8 Figures)**. Model Armor regional templates, pure-ASGI DLP domestic phone redaction (ADR-3), Agent Registry, 8/8 Red-Team block. |
+| **Pillar 4: Optimise** | [`Optimise Guide ↗`](https://duncmon.github.io/ai-devcamp-labs/instructor/lab-4-optimize.html) | [**Lab 4 Walkthrough ↗**](https://duncmon.github.io/ai-devcamp-labs/lab-4.html) | **8 / 9 Verified (Steps 1–8 Green)**. Golden baseline (2m51s), voice hardening & exit-code 0 trap (ADR-8 / Learning 31), 60/60 Monte Carlo simulation sweep, 8-run model right-sizing matrix ($0.386/60 sessions), BigQuery Agent Analytics (Q1–Q6) + Cloud Trace 26-span waterfall, Cloud Build eval-gated deploy (Build ID `24071fdb`, 9m12s), $75 budget alert, live LinkedIn post via Buffer fallback, and complete custom Rowing Coach Agent implementation (33/33 tests green). |
 
 ---
 
@@ -118,17 +118,46 @@ uv run pytest
 
 ---
 
+## Engineering Retrospective: Highlights & Key Learnings
+
+### What We Are Most Proud Of (With Humility)
+1. **Architectural Resilience & Defense-in-Depth:**
+   Rather than building a brittle demo that depends on ideal LLM obedience, we enforced hard architectural invariants:
+   - **Deterministic Code Gates:** Hard human confirmation gates (`require_confirmation=True`) that prevent model bypass under adversarial jailbreaks or urgent demands.
+   - **Boundary PII Protection:** Pure-ASGI middleware intercepting and scrubbing sensitive personal data before prompts reach ADK, LLM context, or Vertex AI durable sessions.
+   - **Dual-Publisher Resilience (ADR-1):** When our live LinkedIn post encountered an upstream API version deprecation error (`HTTP 426 Upgrade Required`), the orchestrator gracefully recovered by routing through the Buffer MCP service to successfully publish to *The Dry Testing Company* without crashing the user turn.
+   - **Monte Carlo Stability:** Achieving a 100% pass rate (60/60 tests) across 10 multi-turn simulated user sweeps under `evals/simulate.py`.
+2. **The Full Cloud-Native Lifecycle:**
+   Deploying the complete stack across both Vertex AI Reasoning Engine (with dedicated cryptographic Agent Identity) and Google Cloud Run via an evaluation-gated Cloud Build pipeline (`cloudbuild.yaml`) that automatically halts deployment if any golden rubric regresses.
+3. **Custom Domain Porting (Rowing Coach Agent):**
+   Successfully translating the entire 4-pillar foundation and the Sovereign PII Blueprint v0.2 to our custom athletic coaching domain (`AI-Devcamp-rowing-coach-agent/`), achieving 33/33 green unit tests, multi-region inference routing, zero-cost SQLite/Firestore state, and domain-critical evaluation rubrics guarding athlete health.
+
+### Our Biggest Difficulty & Pivotal Learning
+* **The "Silent Failure" Traps in Agent Engineering:**
+  The most challenging discoveries throughout this camp were failure modes that traditional unit tests and naive LLM evaluators completely miss:
+  1. **The Evaluation CLI Zero-Exit Trap:** `adk eval` exits with return code `0` even when test cases fail (`Tests failed: 1`), meaning bare CI/CD pipelines happily ship broken agents to production unless defensive regex shell parsing (`grep -oE "Tests failed: [0-9]+"`) is enforced.
+  2. **The Progressive Disclosure Blind Spot (Learning 31):** Under `Mode.AUTO`, frontier models selectively skipped calling `load_skill("brand-voice")` because memory notes masked the deficiency, while naive semantic response matchers falsely scored 1.0. This proved that **evaluating agent tool-use is mandatory**—measuring output text alone leaves critical behavioral drift undetected.
+  3. **The OpenTelemetry Context Detachment Trap (Learning 32):** Async token resets in streaming pipelines silently fail, leaking parent span context across turns to form conjoined **"Franken-Traces"** that corrupt multi-user conversation trees in Vertex AI Online Evaluation.
+
+---
+
 ## Repository Layout
 
 ```
 ai-devcamp-labs/
 ├── docs/                        Duncan's Walkthrough Portfolio (GitHub Pages root)
-│   ├── index.html               Portfolio homepage & bento navigation
-│   ├── lab-1.html ... lab-3.html Lab walkthroughs with authentic traces
-│   ├── learnings.html           27+ empirical engineering post-mortems
+│   ├── index.html               Split-Gateway portal & parallel lab directory
+│   ├── lab-1.html ... lab-4.html Step-by-step walkthroughs with authentic traces (55+ Figures)
+│   ├── learnings.html           35 empirical engineering post-mortems (Pillars 1–4)
+│   ├── ci-cd-eval-gate-and-cloud-build.html      Annexe: Cloud Build CI/CD eval gate
+│   ├── eval-hardening-and-fixtures.html         Annexe: Golden evalset hardening & fixtures
+│   ├── otel-context-detachment-and-evals.html   Annexe: OTel detachment & Franken-traces
+│   ├── progressive-disclosure-and-skill-evals.html Annexe: Skill tool-use invariants
 │   ├── backend-binding.html     Twelve-Factor backend binding architecture
 │   ├── shell-script-flags.html  Standalone CLI flag parsing educational guide
-│   ├── screenshots/             Authentic figures, console logs & traces (87 assets)
+│   ├── stepper-and-buffer-confirmation.html In-flight stepper synchronization
+│   ├── site-design.html         Site design choices & navigation philosophy
+│   ├── screenshots/             Authentic figures, console logs & traces (117 assets)
 │   ├── .nojekyll                Disables Jekyll processing on GitHub Pages
 │   └── instructor/              Upstream workshop curriculum (Sonika Janagill)
 │       ├── index.html           Original instructor docs hub
@@ -136,7 +165,7 @@ ai-devcamp-labs/
 │       ├── LEARNINGS.md         Instructor pre-flight notes
 │       └── img/                 Original workshop architecture diagrams
 ├── backend/
-│   ├── social_poster/           Orchestrator, subagents, tools, guardrails
+│   ├── social_poster/           Orchestrator, subagents, tools, guardrails, config
 │   ├── pii_middleware.py        Pure-ASGI Cloud DLP redaction middleware
 │   ├── governance.py            POLA hierarchical project resolution CLI
 │   └── main.py                  FastAPI server: AG-UI SSE route, memory & sessions
@@ -144,9 +173,17 @@ ai-devcamp-labs/
 │   ├── app/lib/backend.ts       Deterministic Twelve-Factor backend binding
 │   └── app/components/          Stage stepper, activity feed, status badge
 ├── evals/                       adk eval datasets, simulation scripts, SQL analytics
-├── skills/                      Agent Skills (brand voice)
-├── run-backend.sh               Backend launcher script
-├── run-frontend.sh              Frontend launcher with --local and --cloud CLI flags
+│   ├── golden.json              5 golden evaluation cases + rubrics
+│   ├── eval_config.json         Rubric configurations (tool use & response quality)
+│   ├── simulate.py              Multi-turn adversarial scenario generator
+│   ├── analytics.py             BigQuery telemetry SQL evaluator (Q1–Q6)
+│   ├── deploy_with_eval_gate.sh Local process-level CI eval gate
+│   └── verify_eval_gate.sh      Empirical parser test proving the zero-exit trap
+├── skills/                      Agent Skills (brand-voice, platform-style, post-formatter)
+├── mcp/                         Standalone FastMCP stdio scripts (linkedin_server.py)
+├── cloudbuild.yaml              Google Cloud Build CI/CD eval-gated pipeline
+├── run-backend.sh               Backend launcher script (:8000)
+├── run-frontend.sh              Frontend launcher with --local and --cloud CLI flags (:3000)
 └── PROGRESS.md                  Authoritative master memory charter & action plan
 ```
 
