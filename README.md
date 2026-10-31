@@ -120,24 +120,24 @@ uv run pytest
 
 ## Engineering Retrospective: Highlights & Key Learnings
 
-### What We Are Most Proud Of (With Humility)
+### What We Believe Are Good Implementations
 1. **Architectural Resilience & Defense-in-Depth:**
    Rather than building a brittle demo that depends on ideal LLM obedience, we enforced hard architectural invariants:
-   - **Deterministic Code Gates:** Hard human confirmation gates (`require_confirmation=True`) that prevent model bypass under adversarial jailbreaks or urgent demands.
-   - **Boundary PII Protection:** Pure-ASGI middleware intercepting and scrubbing sensitive personal data before prompts reach ADK, LLM context, or Vertex AI durable sessions.
-   - **Dual-Publisher Resilience (ADR-1):** When our live LinkedIn post encountered an upstream API version deprecation error (`HTTP 426 Upgrade Required`), the orchestrator gracefully recovered by routing through the Buffer MCP service to successfully publish to *The Dry Testing Company* without crashing the user turn.
-   - **Monte Carlo Stability:** Achieving a 100% pass rate (60/60 tests) across 10 multi-turn simulated user sweeps under `evals/simulate.py`.
+   - [**Deterministic Code Gates**](https://duncmon.github.io/ai-devcamp-labs/stepper-and-buffer-confirmation.html): Hard human confirmation gates (`require_confirmation=True`) that prevent model bypass under adversarial jailbreaks or urgent demands.
+   - [**Boundary PII Protection (ADR-3)**](https://duncmon.github.io/ai-devcamp-labs/lab-3.html#step-4): Pure-ASGI middleware intercepting and scrubbing sensitive personal data before prompts reach ADK, LLM context, or Vertex AI durable sessions.
+   - [**Dual-Publisher Resilience (ADR-1)**](https://duncmon.github.io/ai-devcamp-labs/lab-4.html#step-7): When our live LinkedIn post encountered an upstream API version deprecation error (`HTTP 426 Upgrade Required`), the orchestrator gracefully recovered by routing through the Buffer MCP service to successfully publish to *The Dry Testing Company* without crashing the user turn.
+   - [**Monte Carlo Stability (60/60 Tests)**](https://duncmon.github.io/ai-devcamp-labs/lab-4.html#step-3): Achieving a 100% pass rate (60/60 tests) across 10 multi-turn simulated user sweeps under `evals/simulate.py`.
 2. **The Full Cloud-Native Lifecycle:**
-   Deploying the complete stack across both Vertex AI Reasoning Engine (with dedicated cryptographic Agent Identity) and Google Cloud Run via an evaluation-gated Cloud Build pipeline (`cloudbuild.yaml`) that automatically halts deployment if any golden rubric regresses.
-3. **Custom Domain Porting (Rowing Coach Agent):**
-   Successfully translating the entire 4-pillar foundation and the Sovereign PII Blueprint v0.2 to our custom athletic coaching domain (`AI-Devcamp-rowing-coach-agent/`), achieving 33/33 green unit tests, multi-region inference routing, zero-cost SQLite/Firestore state, and domain-critical evaluation rubrics guarding athlete health.
+   Deploying the complete stack across both Vertex AI Reasoning Engine (with dedicated cryptographic Agent Identity) and Google Cloud Run via an evaluation-gated Cloud Build pipeline ([`cloudbuild.yaml`](cloudbuild.yaml)) that automatically halts deployment if any golden rubric regresses.
+3. **Custom Domain Porting ([Rowing Coach Agent](https://github.com/duncmon/AI-Devcamp-rowing-coach-agent)):**
+   Successfully translating the entire 4-pillar foundation and the Sovereign PII Blueprint v0.2 to our custom athletic coaching domain ([`AI-Devcamp-rowing-coach-agent`](https://github.com/duncmon/AI-Devcamp-rowing-coach-agent)), achieving 33/33 green unit tests, multi-region inference routing, zero-cost SQLite/Firestore state, and domain-critical evaluation rubrics guarding athlete health.
 
 ### Our Biggest Difficulty & Pivotal Learning
 * **The "Silent Failure" Traps in Agent Engineering:**
   The most challenging discoveries throughout this camp were failure modes that traditional unit tests and naive LLM evaluators completely miss:
-  1. **The Evaluation CLI Zero-Exit Trap:** `adk eval` exits with return code `0` even when test cases fail (`Tests failed: 1`), meaning bare CI/CD pipelines happily ship broken agents to production unless defensive regex shell parsing (`grep -oE "Tests failed: [0-9]+"`) is enforced.
-  2. **The Progressive Disclosure Blind Spot (Learning 31):** Under `Mode.AUTO`, frontier models selectively skipped calling `load_skill("brand-voice")` because memory notes masked the deficiency, while naive semantic response matchers falsely scored 1.0. This proved that **evaluating agent tool-use is mandatory**—measuring output text alone leaves critical behavioral drift undetected.
-  3. **The OpenTelemetry Context Detachment Trap (Learning 32):** Async token resets in streaming pipelines silently fail, leaking parent span context across turns to form conjoined **"Franken-Traces"** that corrupt multi-user conversation trees in Vertex AI Online Evaluation.
+  1. [**The Evaluation CLI Zero-Exit Trap**](https://duncmon.github.io/ai-devcamp-labs/ci-cd-eval-gate-and-cloud-build.html): `adk eval` exits with return code `0` even when test cases fail (`Tests failed: 1`), meaning bare CI/CD pipelines happily ship broken agents to production unless defensive regex shell parsing (`grep -oE "Tests failed: [0-9]+"`) is enforced.
+  2. **The Progressive Disclosure Blind Spot ([Learning 31](https://duncmon.github.io/ai-devcamp-labs/progressive-disclosure-and-skill-evals.html)):** Under `Mode.AUTO`, frontier models selectively skipped calling `load_skill("brand-voice")` because memory notes masked the deficiency, while naive semantic response matchers falsely scored 1.0. This proved that **evaluating agent tool-use is mandatory**—measuring output text alone leaves critical behavioral drift undetected.
+  3. **The OpenTelemetry Context Detachment Trap ([Learning 32](https://duncmon.github.io/ai-devcamp-labs/otel-context-detachment-and-evals.html)):** Async token resets in streaming pipelines silently fail, leaking parent span context across turns to form conjoined **"Franken-Traces"** that corrupt multi-user conversation trees in Vertex AI Online Evaluation.
 
 ---
 
