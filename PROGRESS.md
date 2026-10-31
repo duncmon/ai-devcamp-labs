@@ -381,6 +381,36 @@ flowchart TD
     - `1c28cd5`: feat(evals): add golden evaluation suite, LLM-as-judge rubrics, and fail-closed CI release gate script
     - `880b80d`: docs: author publication-grade static HTML documentation suite capturing architecture, ADRs, and verification matrix
 
+#### Phase 14: Hackathon Day Sprint — Article 9 Health Data Vaulting, Cloud Artifact Delivery, Approval Gate & Docs Redesign [COMPLETED & VERIFIED]
+* **Target Repository:** `/Users/duncanmoncrieff/projects/gdg-london-ai-devcamp-sept26/AI-Devcamp-rowing-coach-agent/` (Branch: `hackathon-dev`)
+* **Event & Deadline:** GDG London AI DevCamp Hackathon (Halloween Edition) | 3:00 PM UK Time.
+* **Reference Specifications:**
+  - `Master Unified System Architecture & Implementation Specification.md` (Section 17: Security, Least Privilege & GDPR Article 9 Compliance).
+  - Implementation Plan: `file:///Users/duncanmoncrieff/.gemini/antigravity/brain/0814051f-3a0d-4014-9cc3-525fd6412fe3/site_and_readme_redesign_plan.md`.
+* **Completed & Verified Deliverables:**
+  1. **GDPR Article 9 Health Data & Non-Decipherable Cryptographic Pseudonyms:**
+     - Replaced naive name tokens with non-decipherable SHA-256 cryptographic tokens (`[ATHLETE_ath_5a77195e]`).
+     - Vault maintains bidirectional mapping: Real Athlete Identity (`"Coach David"`, `"David Montgomery"`) $\leftrightarrow$ Cryptographic Pseudonym Token (`[ATHLETE_ath_5a77195e]`) $\leftrightarrow$ Internal Biometric Roster ID (`david_montgamery`).
+     - Algorithmic tools unwrap pseudonyms seamlessly, returning 2k benchmark splits and Wolverine L4 pacing while keeping personal data 100% redacted from Gemini model weights.
+  2. **Local Plan Mirroring & Artifact Delivery (Resolving Container Isolation):**
+     - `local_proxy.py` intercepts `generate_weekly_sheet` and `generate_coach_notes` to write markdown files directly into local `plans/` directory.
+     - Added `GET /api/plans/{filename}` endpoint and interactive `[Download Plan]` button in web UI.
+  3. **Intervals.icu Human-in-the-Loop Interactive Approval Gate:**
+     - Rendered interactive **[Approve & Stage Workout]** / **[Reject]** Action Card in `local_proxy.py` web UI to break conversational deadlock.
+     - Decoupled read-only `intervals_get_athlete_wellness` from mutating `intervals_schedule_workout`.
+  4. **Concept2 Workout Telemetry Ingestion:**
+     - Added `parse_concept2_workout` tool in `rowing_coach/tools.py` parsing intervals, meters, split, wattage, stroke rate, and heart rate from Concept2 logbook URLs or text dumps.
+  5. **Documentation Site Redesign & Design Critique (`docs/`):**
+     - Converted `ARCHITECTURE_AND_SUBMISSION.md` into fully styled `docs/design-critique.html`.
+     - Harmonized all 5 pages (`index.html`, `walkthrough.html`, `governance-and-pii.html`, `cost-economics.html`, `design-critique.html`) with shared two-column responsive layout, Google Dev Docs right-hand sticky Table of Contents (`toc.js`), lightbox zoom (`lightbox.js`), and dark/light mode toggle.
+     - Embedded authentic morning walk-through screenshots (PII vault panel, persona resolution, L4 pacing alignment, Week 8 plan notes, Memory Bank console, and Reasoning Engine traces).
+     - Deployed interactive Generative UI **GDPR Article 9 Vault & L4 Pacing Simulator** directly in `docs/governance-and-pii.html`.
+     - Repaired all `README.md` documentation links to point strictly to live GitHub Pages URLs (`https://duncmon.github.io/AI-Devcamp-rowing-coach-agent/...`).
+  6. **Automated Documentation Site & Navigation Testing Suite (`tests/test_docs_site.py`):**
+     - Implemented 19 automated tests verifying HTML5 structure, CSS/scripts consistency, bidirectional navigation across all 20 page-to-page permutations, zero broken internal links/anchors, asset non-zero size, and README link invariants.
+     - Total automated test suite: **57 / 57 GREEN (100%)** in 1.46s via `uv run pytest`.
+
+
 #### Parallel Engineering Track: Investigate & Treat Native ADK Web HITL Double-Confirmation Loop [QUEUED]
 * **Status:** 🔍 **Pending Investigation & Treatment**.
 * **Context & Symptoms:** During pre-baseline verification using `uv run adk web backend`, post generation, image asset synthesis (`gallery/post-image-1792681289-5d055086.png`), GCS upload (`lab2-bucket-ai-devcamp-duncan-395792`), and final Buffer queueing succeeded. However, human-in-the-loop (HITL) approval required confirming twice in the ADK web chat. In the first confirmation turn, the orchestrator received a framework message stating *"requires confirmation, please approve or reject"*, which the agent mistakenly interpreted as a downstream Buffer error rather than an internal pause awaiting user action.
