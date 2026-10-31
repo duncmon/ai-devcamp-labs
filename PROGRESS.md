@@ -605,6 +605,23 @@ flowchart TD
   3. **Automated Regression Test Suite Expansion (`tests/test_docs_site.py`):**
      - Implemented `test_mermaid_diagram_responsiveness_and_pipeline_completeness` verifying `.mermaid` CSS rules and complete 4-stage pipeline inclusion.
      - Implemented `test_sandbox_simulator_mock_clarity_and_readability` verifying test bench disclaimer text, Cloud Run links, font size $\ge 13\text{px}$, and line-height $\ge 1.6$.
-     - Total automated test suite: **108 / 108 GREEN (100%) in 1.67s** via `uv run pytest`.
+     - Total automated test suite: **109 / 109 GREEN (100%) in 1.69s** via `uv run pytest`.
+
+---
+
+#### Phase 19: Tool Schema Token Mandate & Zero Parenthetical PII Deployment [COMPLETED & VERIFIED]
+* **Target Repositories:** `/Users/duncanmoncrieff/projects/gdg-london-ai-devcamp-sept26/AI-Devcamp-rowing-coach-agent/` (Branch: `main`)
+* **Reference Commits:** `2db4d6d`, `45491a6`.
+* **Identified Forensic Trace Leaks & Resolutions:**
+  1. **Tool Schema Cleartext Key Elimination (`rowing_coach/tools.py`):**
+     - Replaced parameter docstring examples in `calculate_athlete_pacing`, `align_session_pace_to_l4`, and `lookup_athlete` from `e.g. 'alex_martin', 'david_montgamery'` to `[ATHLETE_ath_5a77195e]`, `[ATHLETE_ath_db95573a]`.
+     - Prevents Gemini from translating pseudonym tokens to cleartext keys in function call arguments.
+  2. **Negative Constraint Against Parenthetical PII (`rowing_coach/agent.py`):**
+     - Injected strict negative system rule: `NEVER emit real names, aliases, or parenthetical annotations in your responses or tool arguments (e.g. NEVER write '[ATHLETE_ath_5a77195e] (Coach David)', 'Coach David', 'David Montgomery', or 'Alex Martin'). Output ONLY the raw token '[ATHLETE_ath_...]'.`
+  3. **Cloud Deployments Active & Verified:**
+     - **Vertex AI Reasoning Engine:** Deployed via `agents-cli deploy` (ID: `5062846700507365376`, Operation `8830578152146206720`).
+     - **Cloud Run Endpoint:** Deployed revision `rowing-coach-demo-00007-mbj` serving 100% of traffic with `DEMO_PASSCODE=rowing-XPeHYSfY-devcamp-2026`.
+     - **Permanent URL:** `https://rowing-coach-demo-498585195540.us-central1.run.app/?code=rowing-XPeHYSfY-devcamp-2026`.
+
 
 
