@@ -169,6 +169,11 @@ The instructor's reference material for Lab 4 introduces several core architectu
 | **OTel Context Detachment & Franken-Traces** | Instructor noted `Failed to detach context` at ERROR during span cleanup; left open question on Online Evaluation impact. | Discovered & Proven **Learning 32**: Cross-task token detachment in async streaming raises `ValueError` in `contextvars.reset()`. Because the token is never cleared, subsequent requests inherit the leaked span context, forging conjoined **"Franken-Traces"** that corrupt multi-user conversation grouping in Vertex AI Online Evaluation. | Wrap ASGI request lifecycles in `contextvars.copy_context().run()` to enforce strict per-request context isolation. Documented in `docs/otel-context-detachment-and-evals.html`. |
 | **Deployed BigQuery Ingestion Gap** | Instructor demo script noted: *"Do not claim... BigQuery rows written by a deployed agent... We verified the local path end to end."* | Discovered **Learning 33**: Deployed engine writes to Cloud Trace but leaves BigQuery `agent_events` unchanged (43 rows). `gcp-setup.sh` granted logging/tracing/storage roles to the Agent Identity principalSet but omitted `roles/bigquery.dataEditor`. | Grant `roles/bigquery.dataEditor` to the Agent Identity principalSet to unlock cloud-native BigQuery event streaming. |
 | **CI/CD Eval-Gate Anatomy & Upstream Build Omissions** | Assumed `cloudbuild.yaml` works out-of-the-box; admitted in codelab that `gcloud builds submit` was never tested. | Discovered **Learning 34**: Unmodified submission fails on: (1) `evals/` excluded in `.gcloudignore`; (2) `gemini-flash-latest` model aliases 404ing on Vertex AI; (3) default Cloud Build SA lacking Vertex AI and Secret Manager roles. | Resolved all three blockers, added `.envrc` permanently to `.gcloudignore`, and verified end-to-end cloud build (9m12s, SUCCESS) and Cloud Run deployment. Documented in `docs/ci-cd-eval-gate-and-cloud-build.html`. |
+| **API Deprecation & Dual-Publisher Resilience** | Assumed direct platform APIs remain stable throughout workshop sessions. | Discovered **Learning 35**: Direct LinkedIn API returned `HTTP 426 Upgrade Required` due to sunsetting of `LinkedIn-Version: 202506`. The orchestrator seamlessly fell back to Buffer MCP (`create_post`) to publish live without service interruption. | Deploy dual-publisher architectures (`POST_VIA=auto`) with dynamic MCP tool fallbacks to absorb upstream version expirations. |
+| **GDPR Article 9 & Engine Translation** | Assumed direct pseudonymization (`[ATHLETE_NAME]`) suffices for model anonymization. | Discovered **Learning 36**: Client-side cryptographic pseudonyms (`[ATHLETE_ath_5a77195e]`) break remote Reasoning Engine entity resolution unless translated at the proxy boundary (`pseudo_to_engine`). Furthermore, egress Gate 2 must rehydrate engine keys back to persona (`Coach David`) while strictly failing closed on orphan tokens (`VaultSafetyError`). | Decouple client PII vault from remote engine identifiers; translate pre-dispatch at proxy boundary; enforce strict rehydration assertion on egress. |
+| **Artifact Delivery & URI Encoding** | Assumed static file serving handles markdown plan exports without encoding concerns. | Discovered **Learning 37**: Coaching plan filenames with spaces and ampersands (`Coach David's UT2 Base Session & Erg Plan.md`) fail on standard `{filename}` route matching (HTTP 404/500). Furthermore, container root paths vary between local development (`PROJECT_ROOT/plans`) and Cloud Run (`/code/plans`, `/tmp/plans`). | Route using `{filename:path}`, unquote with `urllib.parse.unquote()`, sanitize to basename via `pathlib.Path.name`, search fallback directory list, and quote `Content-Disposition` header. |
+| **UI Streaming & Python Raw String Escaping** | Assumed frontend SSE stream parsing in single-file FastAPI templates works without interpolation traps. | Discovered **Learning 38**: In Python multiline raw string HTML templates (`HTML_PAGE = """..."""`), JavaScript `buffer.split('\n\n')` interpolates into physical newlines, breaking JavaScript execution. Must escape as `\\n\\n`. Additionally, client-side theme toggles must manipulate `classList` and `localStorage` dynamically without interrupting streaming SSE connections. | Strictly escape JavaScript regex/split tokens in server-rendered templates (`\\n\\n`); persist UI state (`localStorage`) client-side to prevent session reset. |
+| **Model Armor 4-Checkpoint Tool Shielding** | Assumed ingress prompt screening and egress response masking provide complete agent protection. | Discovered **Learning 39**: Checkpoint ③ (Tool Output Shield via `tool_output_template_name`) is the #1 blind spot in modern agent security. Untrusted data fetched by tools (e.g., Intervals.icu workouts, Concept2 logs, web search) bypasses Ingress filters (Checkpoint ①) and infects LLM context with indirect prompt injection (OWASP LLM01). | Implement all 4 checkpoints: ① Ingress PI/JB shield, ② Tool call schema & HITL confirmation gate, ③ Tool output shield, and ④ Egress Sensitive Data Protection (SDP) redaction. |
 
 ---
 
@@ -217,10 +222,12 @@ flowchart TD
     T6 --> T7["Phase 8: Run Lab 4 Step 3 Simulated Users evals/simulate.py [COMPLETED]"]
     T7 --> T8["Phase 9: Run Lab 4 Step 4 Model Right-Sizing Matrix [COMPLETED]"]
     T8 --> T9["Phase 10: Run Lab 4 Step 5 BigQuery Analytics & Trace Spans [COMPLETED]"]
-    T9 --> T10["Phase 11: Run Lab 4 Step 6 Eval-Gated Cloud Build Deploy [NEXT]"]
-    T10 --> T11["Phase 12: Run Lab 4 Step 7 Budget Alert & Live Post Safeguard"]
-    T11 --> T12["Phase 13: Run Lab 4 Step 8 Rowing Coach Custom Agent Evals"]
-    T12 --> T13["Phase 14: Run Lab 4 Step 9 Teardown & Final Spend Audit"]
+    T9 --> T10["Phase 11: Run Lab 4 Step 6 Eval-Gated Cloud Build Deploy [COMPLETED]"]
+    T10 --> T11["Phase 12: Run Lab 4 Step 7 Budget Alert & Live Post Safeguard [COMPLETED]"]
+    T11 --> T12["Phase 13: Run Lab 4 Step 8 Rowing Coach Custom Agent Evals [COMPLETED]"]
+    T12 --> T13["Phase 14: Hackathon Day Sprint — Article 9 Health Data & Docs Redesign [COMPLETED]"]
+    T13 --> T14["Phase 15: Post-Hackathon Sprint Hardening, 4 Defect Resolutions & Regression Test Suite [COMPLETED & VERIFIED]"]
+    T14 --> T15["Phase 16: Video Recording Showcase & Context Compacting [READY]"]
 ```
 
 #### Phase 1: Retire `PROJECT.md` & Sync Lab 4 Docs [COMPLETED]
@@ -424,3 +431,78 @@ flowchart TD
 * **Cross-Reference & Root Cause Analysis:**
   - Distinct from **Learning 27** ([`docs/learnings.html#issue-stepper-confirmation`](docs/learnings.html#issue-stepper-confirmation) / [`docs/stepper-and-buffer-confirmation.html`](docs/stepper-and-buffer-confirmation.html)) where the AG-UI double confirmation was caused by premature execution without `channelId`.
   - In native `adk web`, `require_confirmation=True` raises an error payload to the agent when awaiting user input, which triggers prompt confusion if the model resumes before the UI event resolves. Needs dedicated treatment in callback or system instruction error handling.
+
+---
+
+#### Phase 15: Post-Hackathon Sprint Hardening, 4 Defect Resolutions & Regression Test Suite [COMPLETED & VERIFIED]
+* **Target Repository:** `/Users/duncanmoncrieff/projects/gdg-london-ai-devcamp-sept26/AI-Devcamp-rowing-coach-agent/` (Branch: `main`)
+* **Reference Commits:** `cb6ec4e`, `73d3bac`, `63df986`, `39ac4cc`, `2357480`.
+* **Completed & Verified Defect Resolutions:**
+  1. **Athlete ID / Pseudonym Translation & Vault Resolution (Issue 1 / Learning 36):**
+     - Resolved mismatch between client-side PII stripping vault producing cryptographic tokens (`[ATHLETE_ath_5a77195e]`) and remote Reasoning Engine expecting roster keys (`david_montgamery`).
+     - In `local_proxy.py`, implemented pre-dispatch dictionary mapping (`pseudo_to_engine`) translating pseudonyms before sending to Vertex AI.
+     - Enforced Gate 2 egress rehydration replacing `david_montgamery` / `David Montgamery` with `Coach David` via `vault.rehydrate()`, asserting against orphan token leakage.
+  2. **Plan Download Route with URL Encoding & Multi-Path Resolution (Issue 2 / Learning 37):**
+     - Replaced strict `{filename}` route with `@app.get("/api/plans/{filename:path}")`.
+     - Integrated `urllib.parse.unquote(filename)` and `pathlib.Path(clean_name).name` sanitization.
+     - Implemented multi-directory fallback search across `PROJECT_ROOT / "plans"`, `Path("plans")`, `Path("/code/plans")`, and `Path("/tmp/plans")`, returning HTTP 200 with quoted `Content-Disposition` header and clean HTTP 404s on missing files.
+  3. **Light/Dark Theme Toggle & LocalStorage Persistence (Issue 3 / Learning 38):**
+     - Added `#theme-toggle-btn` to Cloud Run UI header with `#theme-icon` and `#theme-text`.
+     - Implemented `applyTheme(theme)` toggling `.dark` class on `document.documentElement`, adjusting body theme classes (`bg-slate-100 text-slate-900` vs `bg-darkbg text-slate-200`), and persisting state via `localStorage.setItem('rowing-coach-theme', theme)`.
+     - Fixed Python multiline raw string escaping for SSE stream parsing (`buffer.split('\\n\\n')`).
+  4. **Model Armor 4-Checkpoint Security Architecture (Issue 4 / Learning 39):**
+     - Formalized and documented the 4 checkpoints in the agent execution loop:
+       - Checkpoint ①: Ingress Boundary (Model Armor PI/JB screening via `rowing-coach-guardrails`).
+       - Checkpoint ②: Tool Call Gate (Schema validation & `require_confirmation=True`).
+       - Checkpoint ③: Tool Output Shield (`tool_output_template_name` for RAG/external tool outputs, subagent isolation with `friendly_block`).
+       - Checkpoint ④: Egress Boundary (Model Armor SDP redaction via `rowing-coach-guardrails-output` with zero false blocks).
+     - Documented architecture and OWASP mitigation matrix in `docs/governance-and-pii.html`.
+  5. **Automated Regression Test Suite (`tests/test_regression_fixes.py`):**
+     - Implemented 16 automated tests covering Athlete ID translation, Plan download URL-unquoting, Theme toggle DOM/localStorage inspection, and Model Armor 4-checkpoint configuration.
+     - Total automated test suite: **80 / 80 GREEN (100%) in 1.59s** via `uv run pytest`.
+
+#### Handover Plan: 3:00 PM French Time Video Recording Showcase & Context Compacting
+* **Hard Deadline:** 3:00 PM French Time (15:00 CET / 14:00 UK Time) | Oct 31, 2026.
+* **Objective:** Clean execution of the 3-minute hackathon pitch video (`PRESENTATION_PITCH_SCRIPT.md`) demonstrating live `Rowing Coach Agent` on `http://localhost:8080`.
+* **Rationale for New Conversation / Context Compacting:** Current conversation context has accumulated heavy diagnostic, survey, and evaluation traces. A fresh conversation guarantees instant model response, zero token latency, and clean memory bounds for the recording session.
+
+* **Step-by-Step Stand-Up Protocol for New Conversation:**
+  1. **Working Directory & Subshell Invariant:**
+     ```bash
+     cd /Users/duncanmoncrieff/projects/gdg-london-ai-devcamp-sept26/AI-Devcamp-rowing-coach-agent
+     export CLOUDSDK_ACTIVE_CONFIG_NAME="ai-devcamp"
+     export GOOGLE_CLOUD_PROJECT="ai-devcamp-duncan-395792"
+     ```
+  2. **Launch Local Cloud Proxy:**
+     ```bash
+     ./run-frontend.sh --cloud
+     ```
+     - Server starts on `http://localhost:8080`.
+     - Validates proxy health via `curl http://localhost:8080/healthz` (`status: ok, target: cloud`).
+  3. **Browser Setup for Recording:**
+     - Open Google Chrome to `http://localhost:8080` in 1920x1080 (1080p, 16:9 ratio).
+     - Click **Reset Chat** (`#reset-session-btn`) to start with an empty slate.
+     - Verify theme toggle (`#theme-toggle-btn`) is responsive.
+  4. **Video Recording Execution (Exact Script Cues from `PRESENTATION_PITCH_SCRIPT.md`):**
+     - **Scene 1 (0:00–0:35):** The Hook & GDPR Article 9 Health Data dilemma.
+     - **Scene 2 (0:35–1:15):** 4-Pillar Architecture & Python physics engine.
+     - **Scene 3 (1:15–2:05):** Click prompt chip `💡 Calculate L4 Grid for Alex Martin` -> Show Stepper -> Show human confirmation gate on Intervals.icu.
+     - **Scene 4 (2:05–2:40):** Click prompt chip `💡 Coach David's UT2 Base Session` -> Open PII Vault tab -> Show `[ATHLETE_ath_5a77195e]` pseudonymization -> Show `[Download Plan]` button -> Show Model Armor refusal on adversarial prompt.
+     - **Scene 5 (2:40–3:00):** Impact, GitHub Pages portfolio links, and closing.
+  5. **Post-Recording Stand-Down (Zero-Spend Invariant):**
+     - Stop local proxy (`pkill -f local_proxy.py`).
+     - Audit active Reasoning Engines and Cloud Run services; confirm zero accidental lingering compute.
+
+---
+
+#### Phase 16: Tactical Video Demo Recording Stand-Down & Submission Roadmap (15:20 CET) [ACTIVE]
+* **Strategic Pause Decision (15:20 CET):**
+  - All active implementation paused at 15:20 French time to focus 100% of effort on recording the 3-minute YouTube video demo and completing the hackathon submission portal entry.
+  - **Environment Decision (Cloud Run vs. Local Frontend):**
+    - **Primary Demo Target:** Live Cloud Run URL (`https://rowing-coach-demo-498585195540.us-central1.run.app/?code=rowing-XPeHYSfY-devcamp-2026`). Proves authentic Google Cloud deployment with live Vertex AI Reasoning Engine connectivity.
+    - **Local Fallback:** `./run-frontend.sh --local` on `http://localhost:8080` kept active in background as a zero-latency fallback.
+  - **Cloud Run URL Permanence:**
+    - Confirmed: The Cloud Run service URL `https://rowing-coach-demo-498585195540.us-central1.run.app` is permanent and will not change across new revisions or deployments.
+  - **Post-Submission Track:**
+    - Once the YouTube video and submission form are submitted, any remaining polish or enhancements can resume safely without risk to the live reviewer entry point.
+
