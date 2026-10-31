@@ -11,7 +11,7 @@
 | **Lab 1: Build** | Local ADK Agent, Tools, Skills, Subagents, Buffer MCP, LinkedIn MCP, AG-UI Frontend | **9 / 9 Verified (100%)** | Fully documented in [`docs/lab-1.html`](docs/lab-1.html) with 26 figures and real traces. | Production-grade; `POST_VIA=auto` dual routing, V4 signed URLs, single confirmation gate. |
 | **Lab 2: Scale** | Agent Runtime, Durable Sessions, Memory Bank, Cloud Run Proxy, Cloud Logging | **9 / 9 Verified (100%)** | Fully documented in [`docs/lab-2.html`](docs/lab-2.html) with 12 figures and authentic telemetry traces. | Scaled to Vertex AI Reasoning Engine with dedicated Agent Identity; cold-start memory extraction callback. |
 | **Lab 3: Govern** | Model Armor, Cloud DLP ASGI Middleware, Agent Registry, Governance Policies, Gateway | **9 / 9 Verified (100%)** | Fully documented in [`docs/lab-3.html`](docs/lab-3.html) Steps 1–9 with completed Red-Team scoresheet and custom agent roadmap. | Multi-tier config resolution, fail-closed PII redaction with multi-country domestic phone regexes. |
-| **Lab 4: Optimise** | Golden Evals, Rubric-Based Scoring, Deliberate Voice Breaks, Scenario Generation (`simulate.py`), Model Right-Sizing, BigQuery Agent Analytics, Cloud Trace Spans, Eval-Gated Cloud Build Deploy, Budget Alerts, Custom Agent Evals (Rowing Coach) | **8 / 9 Verified (Steps 1–8 Green)** | Documented in [`docs/lab-4.html`](docs/lab-4.html) with 5/5 baseline (2m51s), red run exit-code 0 proof (`Figure 2.1`), authentic 60/60 simulated sweep (`Figure 3.2`), 8-run stability matrix (`Table 4.1`), BigQuery analytics Q1–Q6 (`Figure 5.1`), Cloud Build deploy (`Figures 6.1–6.7`), $75 budget alert, authentic live LinkedIn post publication via Buffer fallback (`Figures 7.1 & 7.2`), and complete Rowing Coach custom agent implementation across Labs 3, 4, and Blueprint v0.2 (33/33 tests green, fail-closed eval gate). | App-level plugin architecture (`from_app`), fail-closed deploy gate, multi-agent telemetry grouping by `agent`, mandatory tool-use evaluation, dual-publisher resilience, sovereign EU boundary. |
+| **Lab 4: Optimise** | Golden Evals, Rubric-Based Scoring, Deliberate Voice Breaks, Scenario Generation (`simulate.py`), Model Right-Sizing, BigQuery Agent Analytics, Cloud Trace Spans, Eval-Gated Cloud Build Deploy, Budget Alerts, Custom Agent Evals (Rowing Coach) | **8 / 9 Verified (Steps 1–8 Green)** | Documented in [`docs/lab-4.html`](docs/lab-4.html) with 5/5 baseline (2m51s), red run exit-code 0 proof (`Figure 2.1`), authentic 60/60 simulated sweep (`Figure 3.2`), 8-run stability matrix (`Table 4.1`), BigQuery analytics Q1–Q6 (`Figure 5.1`), Cloud Build deploy (`Figures 6.1–6.7`), $75 budget alert, authentic live LinkedIn post publication via Buffer fallback (`Figures 7.1 & 7.2`), and complete Rowing Coach custom agent implementation across Labs 3, 4, Blueprint v0.2, and Milestones M1 & M2 (106/106 tests green, Vertex AI Reasoning Engine `5062846700507365376` & Cloud Run `rowing-coach-demo-00005-fr5` redeployed, GDPR Article 9 sovereign PII zero-leakage trace boundary verified). | App-level plugin architecture (`from_app`), fail-closed deploy gate, multi-agent telemetry grouping by `agent`, mandatory tool-use evaluation, dual-publisher resilience, sovereign EU boundary. |
 
 > **Document Retirement Notice (October 22, 2026):**  
 > The temporary milestone specification document `PROJECT.md` (authored in commit `2224882` for Features F1–F10 of Twelve-Factor Backend Binding and CLI Guide) was formally retired and removed from the repository root. All 4 milestones (M1–M4) and features (F1–F10) were 100% completed. Its surviving interface contracts (`GET /api/backend-status` JSON shape `{ origin, isLocal, healthy }`, AG-UI SSE stream error protocol on `/api/adk`, and `./run-frontend.sh [--local | --cloud | -h]` flag parsing) are preserved in ADR-4, ADR-5, and Section 3 of this document, and fully documented in `docs/backend-binding.html` and `docs/shell-script-flags.html`. The last pushed git commit containing `PROJECT.md` was `2224882`.
@@ -174,6 +174,7 @@ The instructor's reference material for Lab 4 introduces several core architectu
 | **Artifact Delivery & URI Encoding** | Assumed static file serving handles markdown plan exports without encoding concerns. | Discovered **Learning 37**: Coaching plan filenames with spaces and ampersands (`Coach David's UT2 Base Session & Erg Plan.md`) fail on standard `{filename}` route matching (HTTP 404/500). Furthermore, container root paths vary between local development (`PROJECT_ROOT/plans`) and Cloud Run (`/code/plans`, `/tmp/plans`). | Route using `{filename:path}`, unquote with `urllib.parse.unquote()`, sanitize to basename via `pathlib.Path.name`, search fallback directory list, and quote `Content-Disposition` header. |
 | **UI Streaming & Python Raw String Escaping** | Assumed frontend SSE stream parsing in single-file FastAPI templates works without interpolation traps. | Discovered **Learning 38**: In Python multiline raw string HTML templates (`HTML_PAGE = """..."""`), JavaScript `buffer.split('\n\n')` interpolates into physical newlines, breaking JavaScript execution. Must escape as `\\n\\n`. Additionally, client-side theme toggles must manipulate `classList` and `localStorage` dynamically without interrupting streaming SSE connections. | Strictly escape JavaScript regex/split tokens in server-rendered templates (`\\n\\n`); persist UI state (`localStorage`) client-side to prevent session reset. |
 | **Model Armor 4-Checkpoint Tool Shielding** | Assumed ingress prompt screening and egress response masking provide complete agent protection. | Discovered **Learning 39**: Checkpoint ③ (Tool Output Shield via `tool_output_template_name`) is the #1 blind spot in modern agent security. Untrusted data fetched by tools (e.g., Intervals.icu workouts, Concept2 logs, web search) bypasses Ingress filters (Checkpoint ①) and infects LLM context with indirect prompt injection (OWASP LLM01). | Implement all 4 checkpoints: ① Ingress PI/JB shield, ② Tool call schema & HITL confirmation gate, ③ Tool output shield, and ④ Egress Sensitive Data Protection (SDP) redaction. |
+| **Sovereign PII & Ingress Token Preservation** | Assumed client-side vaulting must unmask to backend roster keys (`pseudo_to_engine`) so reasoning engine tools can look up athletes. | Discovered **Learning 40**: Unmasking at the proxy boundary (`pseudo_to_engine`) leaks raw athlete IDs across the cloud network into Vertex AI prompt logs and Cloud Console traces. Tools must instead accept cryptographic tokens directly, query local benchmarks via pseudonym fields, and return pseudonym tokens `[ATHLETE_ath_...]` back to the model under GDPR Article 9. Gate 2 client-side rehydration safely restores friendly names at the browser boundary while failing closed on orphan tokens (`VaultSafetyError`). | Fails closed at cloud ingress. Cloud Trace & Cloud Logging record zero PII. Container duality solved via `${APP_MODULE:-main:app}`. |
 
 ---
 
@@ -495,7 +496,7 @@ flowchart TD
 
 ---
 
-#### Phase 16: Tactical Video Demo Recording Stand-Down & Submission Roadmap (15:20 CET) [ACTIVE]
+#### Phase 16: Tactical Video Demo Recording Stand-Down & Submission Roadmap (15:20 CET) [COMPLETED]
 * **Strategic Pause Decision (15:20 CET):**
   - All active implementation paused at 15:20 French time to focus 100% of effort on recording the 3-minute YouTube video demo and completing the hackathon submission portal entry.
   - **Environment Decision (Cloud Run vs. Local Frontend):**
@@ -505,4 +506,105 @@ flowchart TD
     - Confirmed: The Cloud Run service URL `https://rowing-coach-demo-498585195540.us-central1.run.app` is permanent and will not change across new revisions or deployments.
   - **Post-Submission Track:**
     - Once the YouTube video and submission form are submitted, any remaining polish or enhancements can resume safely without risk to the live reviewer entry point.
+
+---
+
+#### Phase 17: End-to-End Sovereign PII Zero-Leakage, Dual-Theme UI & Cloud Alignment (Milestones M1 & M2) [COMPLETED & VERIFIED]
+* **Target Repositories:** 
+  - `/Users/duncanmoncrieff/projects/gdg-london-ai-devcamp-sept26/AI-Devcamp-rowing-coach-agent/` (Branch: `main`)
+  - `/Users/duncanmoncrieff/projects/gdg-london-ai-devcamp-sept26/ai-devcamp-labs/`
+* **Architectural Scope & Objectives (Milestone M1 — Implementation & Test Parity):**
+  1. **Ingress Token Preservation (GDPR Article 9 Zero-Trace Boundary):**
+     - Eliminated `pseudo_to_engine` dictionary unmasking in `local_proxy.py`.
+     - User prompts containing cryptographic vault tokens (`[ATHLETE_ath_5a77195e]`, `[ATHLETE_ath_db95573a]`) are preserved verbatim across the network boundary to Vertex AI Reasoning Engine.
+  2. **Tool Output Pseudonymization (`rowing_coach/tools.py`):**
+     - Updated `lookup_athlete`, `get_squad_roster`, `calculate_athlete_pacing`, and `align_session_pace_to_l4` to return pseudonym tokens (`[ATHLETE_ath_...]`) in both `"id"` and `"name"` fields.
+     - Stripped all cleartext athlete names from `not_found` and `multiple_matches` messages in `lookup_athlete`, completely eliminating roster leakage.
+     - Prevents athlete biometric data and names from leaking into model reasoning traces, function call arguments, or Cloud Logging.
+  3. **Gate 2 Client-Side Rehydration & `import re` NameError Resolution (`pii_vault.py` & `local_proxy.py`):**
+     - Retained top-level `import re` in `local_proxy.py` to prevent stream-aborting `NameError` exceptions.
+     - Equipped `ReversiblePiiVault` with `_load_squad_reverse_map()` so `rehydrate()` resolves squad tokens returned by tools (e.g. from `get_squad_roster`) into display names (`Coach David`, `Alex Martin`, etc.), while maintaining fail-closed `VaultSafetyError` protection against unknown orphan tokens.
+     - Updated Gate 2 client rehydration in `local_proxy.py` to look up coach persona from `sess_vault.get("to_raw", {})` and rehydrate all variations cleanly.
+  4. **Responsive Dual-Theme UI (`local_proxy.py` `HTML_PAGE`):**
+     - Replaced hardcoded dark classes (`bg-darkbg`, `bg-darkpanel`, `border-darkborder`, `border-slate-700`, `text-white`) with responsive paired Tailwind classes (`bg-white dark:bg-darkpanel`, `bg-slate-100 dark:bg-darkbg`, `border-slate-200 dark:border-darkborder`, `text-slate-900 dark:text-white`).
+     - Fixed `<main>` container canvas mask, stepper badges, cards, quick chips, chat inputs, dynamic SSE message slots, and embedded scrollbar/prose CSS styles.
+  5. **Container Entrypoint Duality (`Dockerfile`):**
+     - Parameterized `CMD ["sh", "-c", "uv run uvicorn ${APP_MODULE:-main:app} --host 0.0.0.0 --port ${PORT}"]` with `ENV APP_MODULE=main:app`.
+     - Enables seamless builds for both Vertex AI Reasoning Engine (`main:app`) and Cloud Run (`local_proxy:app`) from the same container image.
+  6. **Automated Regression Test Suite:**
+     - Updated `tests/test_regression_fixes.py` to assert token preservation during ingress.
+     - Added automated regression tests verifying GDPR Article 9 tool pseudonym returns and Gate 2 squad token rehydration without prompt PII.
+     - Updated `tests/test_tools.py` and `tests/test_athlete_vault_resolution.py` to verify tool pseudonym tokens under GDPR Article 9.
+     - Full test suite verified green: **106 / 106 tests passing** via `uv run pytest`.
+
+* **Production Deployment & Cloud Trace Verification (Milestone M2):**
+  1. **Vertex AI Reasoning Engine Redeployment (`rowing-coach-agent`):**
+     - **Timestamp**: `2026-10-31T16:16:52.388227+00:00`
+     - **Resource URI**: `projects/498585195540/locations/us-central1/reasoningEngines/5062846700507365376`
+     - **Operation ID**: `7213385663687688192`
+     - **Agent Identity**: `principal://agents.global.proj-498585195540.system.id.goog/resources/aiplatform/projects/498585195540/locations/us-central1/reasoningEngines/5062846700507365376`
+     - **Deployment Manifest & Metadata**: Verified in `AI-Devcamp-rowing-coach-agent/deployment_metadata.json`.
+  2. **Google Cloud Run Redeployment & Passkey Gating Alignment (`rowing-coach-demo`):**
+     - **Timestamp**: `2026-10-31T16:48:50Z`
+     - **Revision**: `rowing-coach-demo-00006-pr9`
+     - **Permanent Public URL**: `https://rowing-coach-demo-498585195540.us-central1.run.app`
+     - **Service Parameters**: `--min-instances=0`, `--max-instances=1`, `--memory=512Mi`, `--cpu=1`, `--port=8080`, `--allow-unauthenticated`.
+     - **Environment Variables Injected & Verified**:
+       - `APP_MODULE=local_proxy:app`
+       - `PROXY_TARGET=cloud`
+       - `GOOGLE_CLOUD_PROJECT=ai-devcamp-duncan-395792`
+       - `GOOGLE_CLOUD_REGION=us-central1`
+       - `AGENT_ENGINE_ID=5062846700507365376`
+       - `MODEL_ARMOR_TEMPLATE_ID=rowing-coach-guardrails`
+       - `DEMO_PASSCODE=rowing-XPeHYSfY-devcamp-2026` (explicitly populated and verified; unauthenticated / invalid requests return HTTP 401 Unauthorized; valid requests return HTTP 200 OK with SSE stream).
+  3. **End-to-End Chat Dispatch Verification:**
+     - **Test 1 (Alex Martin L4 Grid)**:
+       - Command: `curl -N -X POST "https://rowing-coach-demo-498585195540.us-central1.run.app/api/chat" -H "Content-Type: application/json" -H "X-Passcode: rowing-XPeHYSfY-devcamp-2026" -d '{"message": "Calculate L4 grid for Alex Martin", "target": "cloud"}'`
+       - Gate 1 Ingress Vaulting: `vaulted_input: "Calculate L4 grid for [ATHLETE_ath_db95573a]"`
+       - Tool Execution: `calculate_athlete_pacing({"athlete_id": "[ATHLETE_ath_db95573a]"})` (2,845ms)
+       - Model Output: Returned L4 split grid (@16: 2:40.5 through @28: 2:08.4) referencing only token `[ATHLETE_ath_db95573a]`
+       - Gate 2 Egress Rehydration: Rehydrated to `Alex Martin` with 0 orphan token errors (5,433ms total)
+     - **Test 2 (Coach David Aerobic Base Session)**:
+       - Command: `curl -N -X POST "https://rowing-coach-demo-498585195540.us-central1.run.app/api/chat" -H "Content-Type: application/json" -H "X-Passcode: rowing-XPeHYSfY-devcamp-2026" -d '{"message": "What is the recommended aerobic base workout for Coach David today?", "target": "cloud"}'`
+       - Gate 1 Ingress Vaulting: `vaulted_input: "What is the recommended aerobic base workout for [ATHLETE_ath_5a77195e] today?"`
+       - Tool Execution: `get_season_schedule` and `calculate_athlete_pacing({"athlete_id": "[ATHLETE_ath_5a77195e]"})`
+       - Model Output: Prescribed Week 8 Priority 4 UT3 active flush session (35 min @14-16 SPM, 2:34.2-2:40.4 split) referencing only token `[ATHLETE_ath_5a77195e]`
+       - Gate 2 Egress Rehydration: Rehydrated to `Coach David` cleanly with 0 orphan tokens (12,776ms total)
+  4. **Google Cloud Logging & Cloud Console Trace Zero-PII Audit:**
+     - **Cleartext PII Search Filter**:
+       ```
+       resource.type="aiplatform.googleapis.com/ReasoningEngine"
+       resource.labels.reasoning_engine_id="5062846700507365376"
+       ("Alex Martin" OR "David Montgamery" OR "David Montgomery" OR "alex_martin" OR "david_montgamery")
+       ```
+       **Audit Result**: **0 matching log entries** (fail-closed zero PII leakage confirmed).
+     - **Sanitized Token Search Filter**:
+       ```
+       resource.type="aiplatform.googleapis.com/ReasoningEngine"
+       resource.labels.reasoning_engine_id="5062846700507365376"
+       ("ATHLETE_ath_db95573a" OR "ATHLETE_ath_5a77195e")
+       ```
+       **Audit Result**: Matches confirmed in `stream_reasoning_engine` payload logs:
+       - `INFO:main:stream_reasoning_engine payload: {'input': {'message': 'Calculate L4 grid for [ATHLETE_ath_db95573a]', ...}}` (Timestamp `2026-10-31T16:28:38.409687Z`)
+       - `INFO:main:stream_reasoning_engine payload: {'input': {'message': 'What is the recommended aerobic base workout for [ATHLETE_ath_5a77195e] today?', ...}}` (Timestamp `2026-10-31T16:29:04.749552Z`)
+     - **Conclusion**: The complete lifecycle (client vault $\to$ network payload $\to$ Vertex AI Reasoning Engine $\to$ tool invocation $\to$ model response $\to$ client rehydration) maintains strict GDPR Article 9 sovereign PII zero-leakage boundaries with 0 cleartext names or database IDs exposed in cloud telemetry.
+
+---
+
+#### Phase 18: Documentation Mermaid Diagram Overflow Resolution & Mock Test Bench Clarity [COMPLETED]
+* **Target Repository:** `/Users/duncanmoncrieff/projects/gdg-london-ai-devcamp-sept26/AI-Devcamp-rowing-coach-agent/` (Branch: `main`)
+* **Reference Commits:** `43999a0`.
+* **Identified Issues & Engineering Learnings:**
+  1. **Mermaid Diagram Horizontal Overflow (Learning 41):**
+     - Section 1 of `governance-and-pii.html` exhibited horizontal diagram clipping on `.step-card` (`overflow: hidden`), cropping Gate 1 on the left margin.
+     - Added global responsive diagram styling in `docs/style.css` (`.mermaid { overflow-x: auto; max-width: 100%; display: flex; justify-content: center; } .mermaid svg { max-width: 100% !important; height: auto !important; }`).
+     - Restructured Section 1 Mermaid topology to stack vertically (Gate 1 $\to$ Model Armor $\to$ Vertex AI & Tools $\to$ Gate 2), preventing horizontal clipping across all viewport widths.
+  2. **Mock Test Bench vs. Live App Disambiguation:**
+     - Evaluator feedback identified ambiguity between Section 4's client-side simulator and the live Cloud Run application, accompanied by low font contrast in output boxes.
+     - Added prominent educational test bench banner (`🧪 In-Browser Mock Test Bench`) contrasting the in-browser sandbox with the production Cloud Run 3-column app, increased pre-block font size to `13.5px` with `1.6` line-height, and applied high-contrast borders and colored badge headers.
+  3. **Automated Regression Test Suite Expansion (`tests/test_docs_site.py`):**
+     - Implemented `test_mermaid_diagram_responsiveness_and_pipeline_completeness` verifying `.mermaid` CSS rules and complete 4-stage pipeline inclusion.
+     - Implemented `test_sandbox_simulator_mock_clarity_and_readability` verifying test bench disclaimer text, Cloud Run links, font size $\ge 13\text{px}$, and line-height $\ge 1.6$.
+     - Total automated test suite: **108 / 108 GREEN (100%) in 1.67s** via `uv run pytest`.
+
 
